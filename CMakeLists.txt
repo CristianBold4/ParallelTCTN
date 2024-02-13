@@ -20,6 +20,8 @@ add_executable(ParallelTCTN src/main.cpp
         include/Subgraph.h
         src/Utils.cpp
         include/Utils.h
+        src/ParallelTCTN.cpp
+        include/ParallelTCTN.h
 )
 
 add_executable(BuildOracle src/main.cpp

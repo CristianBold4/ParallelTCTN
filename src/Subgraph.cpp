@@ -1,66 +1,70 @@
 #include "Subgraph.h"
 #include <algorithm>
+#include <cassert>
 
-Subgraph::Subgraph(long k) : num_edges_(0) {
-    subgraph_ = ankerl::unordered_dense::map<int, ankerl::unordered_dense::map<int, bool>>(k);
-}
-
-Subgraph::Subgraph() : num_edges_(0) {}
+Subgraph::Subgraph() : num_edges_(0) {};
 
 Subgraph::~Subgraph() {
     subgraph_.clear();
 }
 
-bool Subgraph::add_edge(const int u, const int v, char label) {
+bool Subgraph::add_edge(const EdgeTemp &e, bool heaviness) {
 
-    auto u_it = subgraph_.find(u);
-    if (u_it != subgraph_.end()) {
-        // -- u is already in sg
-        auto uv_it = u_it->second.find(v);
-        if (uv_it != u_it->second.end()) {
-            // -- edge uv is already in sg -> multiple edge
-            return false;
-        }
+    int src = e.u;
+    int dst = e.v;
+    int t = e.time;
+
+    // -- src
+    auto src_it = subgraph_.find(src);
+    if (src_it == subgraph_.end()) {
+        nodes_degree_[src] = 0;
+        // -- init vectors
+        NeighTemp src_neigh;
+        src_neigh.timestamps = std::vector({t});
+        src_neigh.weights = std::vector({heaviness});
+        src_neigh.dirs = std::vector({1});
+
+        ankerl::unordered_dense::map<int, NeighTemp> src_map {};
+        src_map.emplace(dst, src_neigh);
+        subgraph_.emplace(src, src_map);
+    } else {
+        assert(get_degree_node(src) > 0);
+        nodes_degree_[src] ++;
+        // -- push back to vecs
+        subgraph_[src][dst].timestamps.emplace_back(t);
+        subgraph_[src][dst].weights.emplace_back(heaviness);
+        subgraph_[src][dst].dirs.emplace_back(1);
     }
 
-    auto v_it = subgraph_.find(v);
-    if (v_it != subgraph_.end()) {
-        // -- v is already in sg
-        auto vu_it = v_it->second.find(u);
-        if (vu_it != v_it->second.end()) {
-            // -- edge vu is already in sg -> multiple edge
-            return false;
-        }
+    // -- dst
+    auto dst_it = subgraph_.find(dst);
+    if (dst_it == subgraph_.end()) {
+        nodes_degree_[dst] = 0;
+        // -- init vectors
+        NeighTemp dst_neigh;
+        dst_neigh.timestamps = std::vector({t});
+        dst_neigh.weights = std::vector({heaviness});
+        dst_neigh.dirs = std::vector({-1});
+
+        ankerl::unordered_dense::map<int, NeighTemp> dst_map {};
+        dst_map.emplace(dst, dst_neigh);
+        subgraph_.emplace(dst, dst_map);
+    } else {
+        assert(get_degree_node(dst) > 0);
+        nodes_degree_[dst] ++;
+        // -- push back to vecs
+        subgraph_[dst][src].timestamps.emplace_back(t);
+        subgraph_[dst][src].weights.emplace_back(heaviness);
+        subgraph_[dst][src].dirs.emplace_back(-1);
     }
 
-    // -- edge not present in the subgraph
     num_edges_++;
-    bool is_det = (label != 'L');
-//    u_it->second.emplace(v, is_det);
-//    v_it->second.emplace(u, is_det);
-    subgraph_[u].emplace(v, is_det);
-    subgraph_[v].emplace(u, is_det);
-
     return true;
 
 }
 
 bool Subgraph::remove_edge(const int u, const int v) {
-
-    auto u_it = subgraph_.find(u);
-    auto v_it = subgraph_.find(v);
-    if (u_it != subgraph_.end() && v_it != subgraph_.end()){
-        // -- edge is present in sg
-        num_edges_--;
-        u_it->second.erase(v);
-        v_it->second.erase(u);
-        return true;
-
-    } else {
-        // -- edge is not present in sg
-        return false;
-    }
-
+    // -- TO BE IMPLEMENTED
 }
 
 void Subgraph::clear() {
@@ -68,62 +72,27 @@ void Subgraph::clear() {
     num_edges_ = 0;
 }
 
-void Subgraph::return_neighbors(const int u, std::vector<std::pair<int, bool>> &u_neighs) const {
-
-    auto u_it = subgraph_.find(u);
-    if (u_it != subgraph_.end()) {
-        for (const auto &neigh: u_it->second) {
-            u_neighs.emplace_back(neigh);
-        }
+void Subgraph::return_neighbors(const int u, std::vector<std::pair<int, NeighTemp>> &u_neighs) {
+    u_neighs.clear();
+    for (const auto &u_neigh : subgraph_[u]) {
+        u_neighs.emplace_back(u_neigh);
     }
 }
 
-void Subgraph::return_edges(std::vector<Edge > &subgraph_edges) const {
 
-    subgraph_edges.clear();
-    for (auto &edge: subgraph_) {
-        int src = edge.first;
-        for (auto &src_neigh: edge.second) {
-            subgraph_edges.emplace_back(src, src_neigh.first);
-        }
-    }
-}
+int Subgraph::get_degree_node(const int u) {
 
-void Subgraph::return_nodes(std::vector<int> &subgraph_nodes) const {
-
-    subgraph_nodes.clear();
-    for (const auto& node : subgraph_) {
-        subgraph_nodes.emplace_back(node.first);
-    }
-
-}
-
-
-void Subgraph::change_edge_label(int u, int v, char new_label) {
-
-    auto u_it = subgraph_.find(u);
-    auto v_it = subgraph_.find(v);
-    if (u_it != subgraph_.end() && v_it != subgraph_.end()) {
-        bool is_det = (new_label != 'L');
-        u_it->second.at(v) = is_det;
-        v_it->second.at(u) = is_det;
-    }
-
-}
-
-int Subgraph::get_degree_node(const int u) const {
-
-    const auto u_it = subgraph_.find(u);
-    if (u_it == subgraph_.end()) {
+    auto u_it = nodes_degree_.find(u);
+    if (u_it == nodes_degree_.end()) {
         return 0;
     }
-    return (int) u_it->second.size();
+    return u_it->second;
+}
+
+int Subgraph::num_nodes() const {
+    return (int) subgraph_.size();
 }
 
 int Subgraph::num_edges() const {
     return num_edges_;
-}
-
-int Subgraph::num_nodes() const {
-    return subgraph_.size();
 }

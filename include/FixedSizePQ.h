@@ -61,4 +61,4 @@ private:
 
 };
 
-#endif //FIXEDSIZEPQ_H
+#endif

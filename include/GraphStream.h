@@ -1,12 +1,12 @@
-#ifndef TRIANGLESWITHPREDICTIONS_GRAPHSTREAM_H
-#define TRIANGLESWITHPREDICTIONS_GRAPHSTREAM_H
+#ifndef PARALLELTCTN_GRAPHSTREAM_H
+#define PARALLELTCTN_GRAPHSTREAM_H
 
 #include <algorithm>
 #include <vector>
 #include <queue>
 #include <fstream>
 
-#define CHUNK_SIZE 500000
+#define CHUNK_SIZE 1000000
 
 typedef struct EdgeStream {
     int u;
@@ -24,6 +24,7 @@ public:
 
     // -- methods
     void read_chunk();
+
     EdgeStream next();
 
     inline bool has_next() {
@@ -40,4 +41,4 @@ private:
 };
 
 
-#endif //TRIANGLESWITHPREDICTIONS_GRAPHSTREAM_H
+#endif
