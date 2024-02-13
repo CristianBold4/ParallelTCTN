@@ -23,10 +23,10 @@ void Utils::build_oracle(std::string &dataset_path, int delta, std::string &type
     // ankerl::unordered_dense::map<EdgeTemp , int, hash_edge> oracle_min_degree;
 
     // - graph
-    ankerl::unordered_dense::map<int, ankerl::unordered_dense::map<int, int>> graph_stream;
+    ankerl::unordered_dense::map<int, ankerl::unordered_dense::map<int, std::vector<int>>> graph_stream;
 
     int u, v, t, du, dv, n_min, n_max, w;
-    ankerl::unordered_dense::map<int, int> min_neighbors;
+    ankerl::unordered_dense::map<int, std::vector<int>> min_neighbors;
     EdgeTemp e1, e2, e3;
 
     int total_T = 0;
@@ -42,8 +42,8 @@ void Utils::build_oracle(std::string &dataset_path, int delta, std::string &type
         t = curr.time;
 
         // -- insert into gs
-        graph_stream[u][v] = t;
-        graph_stream[v][u] = t;
+        graph_stream[u][v].emplace_back(t);
+        graph_stream[v][u].emplace_back(t);
 
         // -- count triangles
         du = (int) graph_stream[u].size();
@@ -57,33 +57,48 @@ void Utils::build_oracle(std::string &dataset_path, int delta, std::string &type
 
         for (const auto &neigh : min_neighbors) {
             w = neigh.first;
-            auto n_max_it = graph_stream[n_max].find(w);
-            if (n_max_it != graph_stream[n_max].end()) {
-
+            for (int neigh_idx = (int)neigh.second.size() - 1; neigh_idx >= 0; neigh_idx --) {
                 // check times
-                if (t - neigh.second > delta || t - n_max_it->second > delta)
-                    continue;
+                int neigh_time = neigh.second[neigh_idx];
+                if (t - neigh_time >= delta)
+                    break;
 
-                total_T ++;
-                common_neighs ++;
+                auto n_max_it = graph_stream[n_max].find(w);
+                if (n_max_it != graph_stream[n_max].end()) {
 
-                // -- sort entries
-                int entry_11 = (n_min < w) ? n_min : w;
-                int entry_12 = (n_min < w) ? w : n_min;
-                int entry_21 = (n_max < w) ? n_max : w;
-                int entry_22 = (n_max < w) ? w : n_max;
+                    std::vector timestamps = n_max_it->second;
 
-                e1.u = entry_11;
-                e1.v = entry_12;
-                e1.time = neigh.second;
+                    for (int idx = (int)timestamps.size() - 1; idx >= 0; idx --) {
+                        int time = timestamps[idx];
+                        // check times
+                        if (t - time >= delta)
+                            break;
 
-                e2.u = entry_21;
-                e2.v = entry_22;
-                e2.time = n_max_it->second;
+                        // -- check if timestamps are equal
+                        if (t == time || t == neigh_time || time == neigh_time)
+                            continue;
+                        total_T++;
+                        common_neighs++;
 
-                oracle_heaviness[e1] += 1;
-                oracle_heaviness[e2] += 1;
+                        // -- sort entries
+                        int entry_11 = (n_min < w) ? n_min : w;
+                        int entry_12 = (n_min < w) ? w : n_min;
+                        int entry_21 = (n_max < w) ? n_max : w;
+                        int entry_22 = (n_max < w) ? w : n_max;
 
+                        e1.u = entry_11;
+                        e1.v = entry_12;
+                        e1.time = neigh_time;
+
+                        e2.u = entry_21;
+                        e2.v = entry_22;
+                        e2.time = time;
+
+                        oracle_heaviness[e1] += 1;
+                        oracle_heaviness[e2] += 1;
+                    }
+
+                }
             }
 
         }
