@@ -29,7 +29,7 @@ void Utils::build_oracle(std::string &dataset_path, int delta, std::string &type
     ankerl::unordered_dense::map<int, std::vector<int>> min_neighbors;
     EdgeTemp e1, e2, e3;
 
-    int total_T = 0;
+    long total_T = 0;
     int common_neighs;
     long nline = 0;
 
@@ -57,9 +57,9 @@ void Utils::build_oracle(std::string &dataset_path, int delta, std::string &type
 
         for (const auto &neigh : min_neighbors) {
             w = neigh.first;
-            for (int neigh_idx = (int)neigh.second.size() - 1; neigh_idx >= 0; neigh_idx --) {
+            for (auto time_w = neigh.second.rbegin(); time_w != neigh.second.rend(); time_w++) {
                 // check times
-                int neigh_time = neigh.second[neigh_idx];
+                int neigh_time = *time_w;
                 if (t - neigh_time >= delta)
                     break;
 
@@ -68,8 +68,8 @@ void Utils::build_oracle(std::string &dataset_path, int delta, std::string &type
 
                     std::vector timestamps = n_max_it->second;
 
-                    for (int idx = (int)timestamps.size() - 1; idx >= 0; idx --) {
-                        int time = timestamps[idx];
+                    for (auto time_nmax = timestamps.rbegin(); time_nmax != timestamps.rend(); time_nmax++) {
+                        int time = *time_nmax;
                         // check times
                         if (t - time >= delta)
                             break;
