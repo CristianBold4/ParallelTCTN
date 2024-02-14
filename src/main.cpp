@@ -27,6 +27,7 @@ int main(int argc, char** argv) {
     char* project = base_name(argv[0]);
     char delimiter = ' ';
     int skip = 0;
+    std::cout << "Cpp Version: " << __cplusplus << "\n";
 
     if (strcmp(project, "BuildOracle") == 0) {
         if (argc != 6) {
