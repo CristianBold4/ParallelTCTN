@@ -276,8 +276,12 @@ void Utils::build_ground_truth(std::string &dataset_path, int delta, std::string
         if (first) {
             first = false;
             old_t = t;
-            for (auto pair : graph_stream) {
-                node = pair.first;
+        }
+
+        // -- graph pruning
+        if (t - old_t >= delta) {
+            old_t = t;
+            for (auto &pair : graph_stream) {
                 neighbors = &pair.second;
                 auto neigh_it = neighbors->begin();
                 while (neigh_it != neighbors->end()) {
@@ -287,12 +291,6 @@ void Utils::build_ground_truth(std::string &dataset_path, int delta, std::string
                 }
 
             }
-        }
-
-        // -- graph pruning
-        if (t - old_t >= delta) {
-            old_t = t;
-
         }
 
         // -- insert into gs
