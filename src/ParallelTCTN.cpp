@@ -209,16 +209,15 @@ void ParallelTCTN::prune() {
 
     subgraph_.prune(curr_time_, delta_);
     // -- node map prune
-    std::vector<PairEdges> *pair_edges;
-    for (auto &pair_nodes: node_map_) {
-        pair_edges = &pair_nodes.second;
-        auto edge_it = pair_edges->begin();
-        while (edge_it != pair_edges->end()) {
-            if (curr_time_ - edge_it->e.time < delta_)
+    ankerl::unordered_dense::map<unsigned long long, std::vector<PairEdges>> new_nm;
+    for (const auto& pair : node_map_){
+        for (int idx_prune = (int) pair.second.size() - 1; idx_prune >= 0; --idx_prune) {
+            if (curr_time_ - (pair.second)[idx_prune].e.time >= delta_)
                 break;
-            edge_it = pair_edges->erase(edge_it);
+            new_nm.emplace(pair);
         }
     }
+    this->node_map_ = new_nm;
 }
 
 
