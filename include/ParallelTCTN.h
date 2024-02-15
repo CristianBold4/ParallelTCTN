@@ -8,6 +8,7 @@
 #include "Subgraph.h"
 #include <ankerl/unordered_dense.h>
 #include <random>
+#include <vector>
 
 #define EdgeSet ankerl::unordered_dense::set<EdgeTemp, hash_edge>
 
