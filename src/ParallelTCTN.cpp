@@ -205,6 +205,8 @@ void ParallelTCTN::process_edge(const int u, const int v, const int t) {
 
 void ParallelTCTN::prune() {
 
+    // std::cout << "Pruning...\n";
+
     subgraph_.prune(curr_time_, delta_);
     // -- node map prune
     std::vector<PairEdges> *pair_edges;

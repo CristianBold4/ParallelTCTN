@@ -24,17 +24,28 @@ bool Subgraph::add_edge(const EdgeTemp &e, bool heaviness) {
 
 void Subgraph::prune(int curr_time, int delta) {
 
-    std::vector<NeighTemp> *neighbors;
-    for (auto &pair : subgraph_) {
-        neighbors = &pair.second;
-        auto neigh_it = neighbors->begin();
-        while (neigh_it != neighbors->end()) {
-            if (curr_time - neigh_it->timestamp < delta)
+    ankerl::unordered_dense::map<int, std::vector<NeighTemp>> new_sg;
+    for (auto pair : subgraph_){
+        for (int idx_prune = (int) pair.second.size() - 1; idx_prune >= 0; --idx_prune) {
+            if (curr_time - (pair.second)[idx_prune].timestamp >= delta) {
                 break;
-            neigh_it = neighbors->erase(neigh_it);
+            }
+            new_sg.emplace(pair);
         }
-
     }
+
+    this->subgraph_ = new_sg;
+//    for (auto &pair : subgraph_) {
+//        neighbors = &pair.second;
+//        auto neigh_it = neighbors->begin();
+//        while (neigh_it != neighbors->end()) {
+//            if (curr_time - neigh_it->timestamp < delta)
+//                break;
+//            neigh_it = neighbors->erase(neigh_it);
+//        }
+//
+//    }
+
 }
 
 
