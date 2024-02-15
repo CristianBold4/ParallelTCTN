@@ -23,7 +23,6 @@ typedef struct NeighTemp {
 } NeighTemp;
 
 #define MAX_N_NODES 500000000
-#define MAX_T_TIMES 2000000000
 
 struct hash_edge {
 
@@ -45,11 +44,11 @@ public:
 
     bool add_edge(const EdgeTemp &e, bool heaviness);
 
-    bool remove_edge(const int u, const int v);
+    void prune(int curr_time, int delta);
 
     void clear();
 
-    void return_neighbors(const int u, std::vector<std::pair<int, NeighTemp>> &u_neighs);
+    std::vector<NeighTemp> * return_neighbors(const int u);
 
     void return_edges(std::vector<EdgeTemp> &subgraph_edges) const;
 
@@ -68,7 +67,7 @@ public:
 private:
 
     // -- subgraph of edges
-    ankerl::unordered_dense::map<int, ankerl::unordered_dense::map<int, NeighTemp>> subgraph_;
+    ankerl::unordered_dense::map<int, std::vector<NeighTemp>> subgraph_;
 
     // -- nodes degree
     ankerl::unordered_dense::map<int, int> nodes_degree_;

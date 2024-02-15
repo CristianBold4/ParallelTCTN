@@ -9,6 +9,7 @@
 #include "ankerl/unordered_dense.h"
 #include "GraphStream.h"
 #include "Subgraph.h"
+#include "ParallelTCTN.h"
 
 
 class Utils {
@@ -27,12 +28,12 @@ public:
     static void build_oracle(std::string &dataset_path, int delta, std::string &type_oracle,
                              double perc_retain, std::string &output_path);
 
+    static void read_oracle(std::string &oracle_path, EdgeSet &oracle);
+
     static void build_ground_truth(std::string &dataset_path, int delta, std::string &type_oracle,
                              double perc_retain, std::string &exact_output_path, std::string &oracle_output_path);
 
     static int count_triangle(EdgeTemp e1, EdgeTemp e2, EdgeTemp e3);
-
-    static void read_oracle();
 
 
 private:

@@ -231,6 +231,17 @@ int Utils::count_triangle(EdgeTemp e1, EdgeTemp e2, EdgeTemp e3) {
 
 }
 
+void Utils::read_oracle(std::string &oracle_path, ankerl::unordered_dense::set<EdgeTemp, hash_edge> &oracle) {
+
+    GraphStream stream(oracle_path, ' ', 0);
+    EdgeStream curr;
+    while (stream.has_next()) {
+        curr = stream.next();
+        oracle.insert({curr.u, curr.v, curr.time});
+    }
+
+}
+
 void Utils::build_ground_truth(std::string &dataset_path, int delta, std::string &type_oracle, double perc_retain,
                                std::string &exact_output_path, std::string &oracle_output_path) {
 
@@ -249,7 +260,7 @@ void Utils::build_ground_truth(std::string &dataset_path, int delta, std::string
     // -- motif counters
     std::array<double, 8> motif_count{};
 
-    int u, v, t, old_t, du, dv, n_min, n_max, w, node, neigh_size;
+    int u, v, t, old_t, du, dv, n_min, n_max, w;
     std::vector<NeighTemp> *min_neighbors, *neighbors;
     // , neighbors;
     std::vector<int>* timestamps;
@@ -260,7 +271,6 @@ void Utils::build_ground_truth(std::string &dataset_path, int delta, std::string
     int common_neighs;
     long nline = 0;
     bool first = true;
-    int it_idx = 0;
 
     old_t = 0;
 
@@ -377,7 +387,6 @@ void Utils::build_ground_truth(std::string &dataset_path, int delta, std::string
                     if (motif_idx != -1)
                         motif_count[motif_idx] ++;
 
-                    // -- TODO: oracle to be incremented even if triangles are not respecting correct order?
                     // -- sort entries
                     int entry_11 = (n_min < w) ? n_min : w;
                     int entry_12 = (n_min < w) ? w : n_min;
