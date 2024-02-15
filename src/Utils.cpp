@@ -1,4 +1,5 @@
 #include "Utils.h"
+#include <cassert>
 
 void Utils::sort_edgemap(const ankerl::unordered_dense::map<EdgeTemp, int, hash_edge> &map,
                          std::vector<std::pair<EdgeTemp, int>> &edge_map) {
@@ -302,16 +303,17 @@ void Utils::build_ground_truth(std::string &dataset_path, int delta, std::string
 
         // -- insert into gs
         NeighTemp nt;
-        nt.node = v;
+        nt.node = curr.v;
         nt.timestamp = t;
         nt.weight = false;
         nt.dir = 1;
-        graph_stream[u].emplace_back(nt);
-        nt.node = u;
+        graph_stream[curr.u].emplace_back(nt);
+
+        nt.node = curr.u;
         nt.timestamp = t;
         nt.weight = false;
         nt.dir = -1;
-        graph_stream[v].emplace_back(nt);
+        graph_stream[curr.v].emplace_back(nt);
 
         // -- count triangles
         du = (int) graph_stream[u].size();
@@ -335,14 +337,13 @@ void Utils::build_ground_truth(std::string &dataset_path, int delta, std::string
                     break;
                 if (neigh_j.node == n_max) {
                     // -- triangle discovered
-//                    // -- check times
+                    // -- check times
                     if (neigh_i.timestamp == neigh_j.timestamp || neigh_i.timestamp == t || neigh_j.timestamp == t)
                         continue;
                     common_neighs ++;
                     total_T++;
 
-
-                    // -- count motifs: we have triangle {n_min, neigh_i, n_max=neigh_j}
+                    // -- count motifs: we have triangle {n_min, w=neigh_i, n_max=neigh_j}
                     // -- sort edges by dir
                     if (neigh_i.dir == 1) {
                         e1.u = n_min;
@@ -364,9 +365,15 @@ void Utils::build_ground_truth(std::string &dataset_path, int delta, std::string
                         e2.time = neigh_j.timestamp;
                     }
                     // -- sort edges by dir
-                    e3.u = curr.u;
-                    e3.v = curr.v;
-                    e3.time = curr.time;
+                    if (curr.u == n_min) {
+                        e3.u = n_min;
+                        e3.v = n_max;
+                        e3.time = curr.time;
+                    } else {
+                        e3.v = n_min;
+                        e3.u = n_max;
+                        e3.time = curr.time;
+                    }
 
                     // -- get motif idx
                     int motif_idx;
