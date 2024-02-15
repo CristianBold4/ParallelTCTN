@@ -1,5 +1,4 @@
 #include "Utils.h"
-#include <cassert>
 
 void Utils::sort_edgemap(const ankerl::unordered_dense::map<EdgeTemp, int, hash_edge> &map,
                          std::vector<std::pair<EdgeTemp, int>> &edge_map) {

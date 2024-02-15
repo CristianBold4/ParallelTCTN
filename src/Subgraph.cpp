@@ -1,5 +1,4 @@
 #include "Subgraph.h"
-#include <algorithm>
 
 Subgraph::Subgraph() : num_edges_(0) {};
 

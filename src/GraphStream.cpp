@@ -1,6 +1,4 @@
 #include "GraphStream.h"
-#include <sstream>
-#include <iostream>
 
 GraphStream::GraphStream(const std::string &filename, const char &delimiter, int skip) {
 

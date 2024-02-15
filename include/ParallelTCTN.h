@@ -2,8 +2,8 @@
 // Created by Cristian Boldrin on 13/02/24.
 //
 
-#ifndef BUILDORACLE_PARALLELTCTN_H
-#define BUILDORACLE_PARALLELTCTN_H
+#ifndef PARALLEL_TCTN_ALGO_H
+#define PARALLEL_TCTN_ALGO_H
 
 #include "Subgraph.h"
 #include <ankerl/unordered_dense.h>
@@ -49,4 +49,4 @@ public:
 };
 
 
-#endif //BUILDORACLE_PARALLELTCTN_H
+#endif

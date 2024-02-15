@@ -2,8 +2,7 @@
 #define PARALLELTCTN_SUBGRAPH_H
 
 #include <vector>
-#include <unordered_map>
-#include <unordered_set>
+#include <algorithm>
 #include "ankerl/unordered_dense.h"
 
 typedef struct EdgeTemp {

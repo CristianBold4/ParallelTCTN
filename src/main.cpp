@@ -27,9 +27,9 @@ int main(int argc, char** argv) {
     int skip = 0;
     std::cout << "Cpp Version: " << __cplusplus << "\n";
 
-    if (strcmp(project, "BuildOracle") == 0) {
+    if (strcmp(project, "BuildExact") == 0) {
         if (argc != 7) {
-            std::cerr << "Usage: BuildOracle (dataset_path) (delta)"
+            std::cerr << "Usage: BuildExact (dataset_path) (delta)"
                          " (type = [Exact, MinDeg]) (retaining_fraction) (exact_output_path) (oracle_output_path)\n";
             return 0;
         } else {
