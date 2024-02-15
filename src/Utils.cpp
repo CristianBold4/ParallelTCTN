@@ -199,9 +199,39 @@ void Utils::build_oracle(std::string &dataset_path, int delta, std::string &type
 
 }
 
+int Utils::count_triangle(EdgeTemp e1, EdgeTemp e2, EdgeTemp e3) {
 
-void Utils::build_oracle_fast(std::string &dataset_path, int delta, std::string &type_oracle, double perc_retain,
-                         std::string &output_path) {
+    int u_1, u_2, u_3, v_1, v_2, v_3;
+    u_1 = e1.u;
+    v_1 = e1.v;
+    u_2 = e2.u;
+    v_2 = e2.v;
+    u_3 = e3.u;
+    v_3 = e3.v;
+
+    if ((u_1 == u_3) && (v_1 == v_2) && (u_2 == v_3))
+        return 0;
+    else if((u_1 == v_3) && (v_1 == v_2) && (u_2 == u_3))
+        return 1;
+    else if ((u_1 == u_3) && (v_1 == u_2) && (v_2 == v_3))
+        return 2;
+    else if ((v_1 == u_2) && (v_2 == u_3) && (v_3 == u_1))
+        return 3;
+    else if ((u_1 == u_2) && (v_1 == v_3) && (v_2 == u_3))
+        return 4;
+    else if ((u_1 == v_2) && (v_1 == v_3) && (u_2 == u_3))
+        return 5;
+    else if ((u_1 == u_2) && (v_1 == u_3) && (v_2 == v_3))
+        return 6;
+    else if ((u_1 == v_2) && (v_1 == u_3) && (v_3 == u_2))
+        return 7;
+    else
+        return -1;
+
+}
+
+void Utils::build_ground_truth(std::string &dataset_path, int delta, std::string &type_oracle, double perc_retain,
+                               std::string &exact_output_path, std::string &oracle_output_path) {
 
 
     std::cout << "Building " << type_oracle << " Oracle...\n";
@@ -215,7 +245,10 @@ void Utils::build_oracle_fast(std::string &dataset_path, int delta, std::string 
     // - graph
     ankerl::unordered_dense::map<int, std::vector<NeighTemp>> graph_stream;
 
-    int u, v, t, t_i, t_j, old_t, du, dv, n_min, n_max, w;
+    // -- motif counters
+    std::array<double, 8> motif_count{};
+
+    int u, v, t, old_t, du, dv, n_min, n_max, w;
     std::vector<NeighTemp> *min_neighbors, *neighbors;
     // , neighbors;
     std::vector<int>* timestamps;
@@ -308,6 +341,44 @@ void Utils::build_oracle_fast(std::string &dataset_path, int delta, std::string 
                     common_neighs ++;
                     total_T++;
 
+
+                    // -- count motifs: we have triangle {n_min, neigh_i, n_max=neigh_j}
+                    // -- sort edges by dir
+                    if (neigh_i.dir == 1) {
+                        e1.u = n_min;
+                        e1.v = w;
+                        e1.time = neigh_i.timestamp;
+                    } else {
+                        e1.v = n_min;
+                        e1.u = w;
+                        e1.time = neigh_i.timestamp;
+                    }
+                    // -- sort edges by dir
+                    if (neigh_j.dir == 1) {
+                        e2.u = w;
+                        e2.v = n_max;
+                        e2.time = neigh_j.timestamp;
+                    } else {
+                        e2.v = w;
+                        e2.u = n_max;
+                        e2.time = neigh_j.timestamp;
+                    }
+                    // -- sort edges by dir
+                    e3.u = curr.u;
+                    e3.v = curr.v;
+                    e3.time = curr.time;
+
+                    // -- get motif idx
+                    int motif_idx;
+                    if (e1.time < e2.time)
+                        motif_idx = count_triangle(e1, e2, e3);
+                    else
+                        motif_idx = count_triangle(e2, e1, e3);
+
+                    if (motif_idx != -1)
+                        motif_count[motif_idx] ++;
+
+                    // -- TODO: oracle to be incremented even if triangles are not respecting correct order?
                     // -- sort entries
                     int entry_11 = (n_min < w) ? n_min : w;
                     int entry_12 = (n_min < w) ? w : n_min;
@@ -347,6 +418,14 @@ void Utils::build_oracle_fast(std::string &dataset_path, int delta, std::string 
     std::cout << "Exact Algo built in " << time << " s\n";
 
     // -- eof
+
+    // -- writing ground truth
+    std::ofstream exact_out_file(exact_output_path);
+    for (auto cnt : motif_count)
+        exact_out_file << cnt << " ";
+    exact_out_file << time;
+    exact_out_file.close();
+
     // -- sorting the map
     std::cout << "Sorting the oracle and retrieving the top " << perc_retain << " values...\n";
     std::vector<std::pair<EdgeTemp, int>> sorted_oracle;
@@ -366,7 +445,7 @@ void Utils::build_oracle_fast(std::string &dataset_path, int delta, std::string 
     std::cout << "Done!\nWriting results...\n";
     int stop_idx = (int) (perc_retain * (int) sorted_oracle.size());
 
-    std::ofstream out_file(output_path);
+    std::ofstream out_file(oracle_output_path);
     std::cout << "Total Delta-Triangles Instances -> " << total_T << "\n";
     std::cout << "Retained Oracle Size = " << stop_idx << "\n";
 
