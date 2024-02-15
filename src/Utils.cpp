@@ -249,7 +249,7 @@ void Utils::build_ground_truth(std::string &dataset_path, int delta, std::string
     // -- motif counters
     std::array<double, 8> motif_count{};
 
-    int u, v, t, old_t, du, dv, n_min, n_max, w;
+    int u, v, t, old_t, du, dv, n_min, n_max, w, node, neigh_size;
     std::vector<NeighTemp> *min_neighbors, *neighbors;
     // , neighbors;
     std::vector<int>* timestamps;
@@ -273,33 +273,27 @@ void Utils::build_ground_truth(std::string &dataset_path, int delta, std::string
         v = (curr.u < curr.v) ? curr.v : curr.u;
         t = curr.time;
 
-//        // -- graph pruning
-//        if (t - old_t >= 20*delta) {
-//            // std::cout << "Pruning subgraph ...\n";
-//            old_t = t;
-//            // -- perform pruning from graph stream
-//            for (const auto &node : graph_stream) {
-//                neighbors = &graph_stream[node.first];
-//                for (auto neigh : *neighbors) {
-//                    // -- loop through timestamps
-////                    neigh.second.erase(std::remove_if(neigh.second.begin(), neigh.second.end(),
-////                                           [&](int time) { return t - time >=  delta; }),
-////                                            neigh.second.end());
-//                    timestamps = &neigh.second;
-//                    auto neigh_time_it = (*timestamps).begin();
-//                    while (neigh_time_it != (*timestamps).end()) {
-//                        if (t - *neigh_time_it < delta) {
-//                            break;
-//                        } else {
-//                            neigh_time_it = (*timestamps).erase(neigh_time_it);
-//                            // neigh_time_it = timestamps.erase(neigh_time_it);
-//                        }
-//
-//                    }
-//                }
-//            }
-//
-//        }
+        if (first) {
+            first = false;
+            old_t = t;
+            for (auto pair : graph_stream) {
+                node = pair.first;
+                neighbors = &pair.second;
+                auto neigh_it = neighbors->begin();
+                while (neigh_it != neighbors->end()) {
+                    if (t - neigh_it->timestamp < delta)
+                        break;
+                    neigh_it = neighbors->erase(neigh_it);
+                }
+
+            }
+        }
+
+        // -- graph pruning
+        if (t - old_t >= delta) {
+            old_t = t;
+
+        }
 
         // -- insert into gs
         NeighTemp nt;
@@ -414,7 +408,7 @@ void Utils::build_ground_truth(std::string &dataset_path, int delta, std::string
         oracle_heaviness[e3] = common_neighs;
 
         nline++;
-        if (nline % 200000 == 0) {
+        if (nline % 1000000 == 0) {
             std::cout << "Processed " << nline << " edges...\n";
         }
 
