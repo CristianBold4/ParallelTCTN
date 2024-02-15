@@ -1,9 +1,6 @@
 #include <iostream>
-#include <iostream>
-#include "GraphStream.h"
 #include "Utils.h"
 #include <string>
-#include <cstdio>
 #include <cstdlib>
 #include <chrono>
 #include <cassert>

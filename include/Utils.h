@@ -27,6 +27,9 @@ public:
     static void build_oracle(std::string &dataset_path, int delta, std::string &type_oracle,
                              double perc_retain, std::string &output_path);
 
+    static void build_oracle_fast(std::string &dataset_path, int delta, std::string &type_oracle,
+                             double perc_retain, std::string &output_path);
+
     static void read_oracle();
 
 

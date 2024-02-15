@@ -1,8 +1,9 @@
 #include "Utils.h"
 
-void Utils::sort_edgemap(const ankerl::unordered_dense::map<EdgeTemp, int, hash_edge>& map, std::vector<std::pair<EdgeTemp, int>> &edge_map) {
+void Utils::sort_edgemap(const ankerl::unordered_dense::map<EdgeTemp, int, hash_edge> &map,
+                         std::vector<std::pair<EdgeTemp, int>> &edge_map) {
 
-    for (auto elem : map) {
+    for (auto elem: map) {
         edge_map.emplace_back(elem);
     }
 
@@ -19,27 +20,62 @@ void Utils::build_oracle(std::string &dataset_path, int delta, std::string &type
     GraphStream stream(dataset_path, ' ', 0);
 
     // -- oracles
-    ankerl::unordered_dense::map<EdgeTemp , int, hash_edge> oracle_heaviness;
+    ankerl::unordered_dense::map<EdgeTemp, int, hash_edge> oracle_heaviness;
     // ankerl::unordered_dense::map<EdgeTemp , int, hash_edge> oracle_min_degree;
 
     // - graph
     ankerl::unordered_dense::map<int, ankerl::unordered_dense::map<int, std::vector<int>>> graph_stream;
 
-    int u, v, t, du, dv, n_min, n_max, w;
-    ankerl::unordered_dense::map<int, std::vector<int>> min_neighbors;
+    int u, v, t, old_t, du, dv, n_min, n_max, w;
+    ankerl::unordered_dense::map<int, std::vector<int>> min_neighbors, neighbors;
+    std::vector<int> timestamps;
     EdgeTemp e1, e2, e3;
 
     long total_T = 0;
     int common_neighs;
     long nline = 0;
+    bool first = true;
+
+    old_t = 0;
 
     EdgeStream curr;
-    while(stream.has_next()) {
+    auto start = std::chrono::high_resolution_clock::now();
+    while (stream.has_next()) {
 
         curr = stream.next();
         u = (curr.u < curr.v) ? curr.u : curr.v;
         v = (curr.u < curr.v) ? curr.v : curr.u;
         t = curr.time;
+
+//        if (first) {
+//            old_t = t;
+//            first = false;
+//        }
+//
+        // -- graph pruning
+        if (t - old_t >= 20*delta) {
+            // std::cout << "Pruning subgraph ...\n";
+            old_t = t;
+            // -- perform pruning from graph stream
+            for (const auto &node : graph_stream) {
+                neighbors = graph_stream[node.first];
+                for (const auto &neigh : neighbors) {
+                    // -- loop through timestamps
+                    timestamps = neigh.second;
+                    std::vector<int>::iterator neigh_time_it = timestamps.begin();
+                    while (neigh_time_it != timestamps.end()) {
+                        if (t - *neigh_time_it < delta) {
+                            break;
+                        } else {
+                            neigh_time_it = timestamps.erase(neigh_time_it);
+                            // neigh_time_it = timestamps.erase(neigh_time_it);
+                        }
+
+                    }
+                }
+            }
+
+        }
 
         // -- insert into gs
         graph_stream[u][v].emplace_back(t);
@@ -55,21 +91,22 @@ void Utils::build_oracle(std::string &dataset_path, int delta, std::string &type
         min_neighbors = graph_stream[n_min];
         common_neighs = 0;
 
-        for (const auto &neigh : min_neighbors) {
+        for (const auto &neigh: min_neighbors) {
             w = neigh.first;
-            for (auto time_w = neigh.second.rbegin(); time_w != neigh.second.rend(); time_w++) {
-                // check times
-                int neigh_time = *time_w;
-                if (t - neigh_time >= delta)
-                    break;
 
-                auto n_max_it = graph_stream[n_max].find(w);
-                if (n_max_it != graph_stream[n_max].end()) {
+            auto n_max_it = graph_stream[n_max].find(w);
+            if (n_max_it != graph_stream[n_max].end()) {
+                // -- triangle found
+                std::vector timestamps = n_max_it->second;
 
-                    std::vector timestamps = n_max_it->second;
+                for (int idx_neigh = (int) neigh.second.size() - 1; idx_neigh >= 0; idx_neigh--) {
+                    // check times
+                    int neigh_time = neigh.second[idx_neigh];
+                    if (t - neigh_time >= delta)
+                        break;
 
-                    for (auto time_nmax = timestamps.rbegin(); time_nmax != timestamps.rend(); time_nmax++) {
-                        int time = *time_nmax;
+                    for (int idx = (int) timestamps.size() - 1; idx >= 0; idx--) {
+                        int time = timestamps[idx];
                         // check times
                         if (t - time >= delta)
                             break;
@@ -115,6 +152,10 @@ void Utils::build_oracle(std::string &dataset_path, int delta, std::string &type
 
     }
 
+    auto stop = std::chrono::high_resolution_clock::now();
+    double time = (double) ((std::chrono::duration_cast<std::chrono::milliseconds>(stop - start)).count()) / 1000;
+    std::cout << "Exact Algo built in " << time << " s\n";
+
     // -- eof
     // -- sorting the map
     std::cout << "Sorting the oracle and retrieving the top " << perc_retain << " values...\n";
@@ -133,7 +174,7 @@ void Utils::build_oracle(std::string &dataset_path, int delta, std::string &type
 
     // -- write results
     std::cout << "Done!\nWriting results...\n";
-    int stop_idx = (int) (perc_retain* (int)sorted_oracle.size());
+    int stop_idx = (int) (perc_retain * (int) sorted_oracle.size());
 
     std::ofstream out_file(output_path);
     std::cout << "Total Delta-Triangles Instances -> " << total_T << "\n";
@@ -143,11 +184,12 @@ void Utils::build_oracle(std::string &dataset_path, int delta, std::string &type
     for (auto elem: sorted_oracle) {
         if (cnt > stop_idx) break;
         out_file << elem.first.u << " " << elem.first.v << " " << elem.first.time << " " << elem.second << "\n";
-        cnt ++;
+        cnt++;
     }
 
     out_file.close();
 
 
-
 }
+
+

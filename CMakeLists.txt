@@ -9,9 +9,10 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-set(CMAKE_CXX_FLAGS "-O3 -mtune=native -Wall")
-set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_FLAGS "-O3 -march=native")
+# set(CMAKE_CXX_FLAGS_DEBUG "-g")
+
 
 add_executable(ParallelTCTN src/main.cpp
         src/GraphStream.cpp

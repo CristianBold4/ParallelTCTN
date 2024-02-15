@@ -16,9 +16,10 @@ typedef struct EdgeTemp {
 } EdgeTemp;
 
 typedef struct NeighTemp {
-    std::vector<int> timestamps;
-    std::vector<bool> weights;
-    std::vector<int> dirs;
+    int node;
+    int timestamp;
+    bool weight;
+    int dir;
 } NeighTemp;
 
 #define MAX_N_NODES 500000000
