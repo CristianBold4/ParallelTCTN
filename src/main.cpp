@@ -42,7 +42,7 @@ int main(int argc, char** argv) {
                 return 0;
             }
             auto start = std::chrono::high_resolution_clock::now();
-            Utils::build_oracle(dataset_path, delta, type_oracle, perc_retain, output_path);
+            Utils::build_oracle_fast(dataset_path, delta, type_oracle, perc_retain, output_path);
             auto stop = std::chrono::high_resolution_clock::now();
             double time = (double) ((std::chrono::duration_cast<std::chrono::milliseconds>(stop - start)).count()) / 1000;
             std::cout << "Oracle " << type_oracle << " successfully built in time: " << time << " s\n";
