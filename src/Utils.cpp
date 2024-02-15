@@ -27,14 +27,16 @@ void Utils::build_oracle(std::string &dataset_path, int delta, std::string &type
     ankerl::unordered_dense::map<int, ankerl::unordered_dense::map<int, std::vector<int>>> graph_stream;
 
     int u, v, t, old_t, du, dv, n_min, n_max, w;
-    ankerl::unordered_dense::map<int, std::vector<int>> min_neighbors, neighbors;
-    std::vector<int> timestamps;
+    ankerl::unordered_dense::map<int, std::vector<int>> *min_neighbors;
+    // , neighbors;
+    std::vector<int>* timestamps;
     EdgeTemp e1, e2, e3;
 
     long total_T = 0;
     int common_neighs;
     long nline = 0;
     bool first = true;
+    int it_idx = 0;
 
     old_t = 0;
 
@@ -52,30 +54,32 @@ void Utils::build_oracle(std::string &dataset_path, int delta, std::string &type
 //            first = false;
 //        }
 //
-        // -- graph pruning
-        if (t - old_t >= 20*delta) {
-            // std::cout << "Pruning subgraph ...\n";
-            old_t = t;
-            // -- perform pruning from graph stream
-            for (const auto &node : graph_stream) {
-                neighbors = graph_stream[node.first];
-                for (const auto &neigh : neighbors) {
-                    // -- loop through timestamps
-                    timestamps = neigh.second;
-                    std::vector<int>::iterator neigh_time_it = timestamps.begin();
-                    while (neigh_time_it != timestamps.end()) {
-                        if (t - *neigh_time_it < delta) {
-                            break;
-                        } else {
-                            neigh_time_it = timestamps.erase(neigh_time_it);
-                            // neigh_time_it = timestamps.erase(neigh_time_it);
-                        }
-
-                    }
-                }
-            }
-
-        }
+//        // -- graph pruning
+//        if (t - old_t >= 20*delta) {
+//            // std::cout << "Pruning subgraph ...\n";
+//            old_t = t;
+//            // -- perform pruning from graph stream
+//            for (const auto &node : graph_stream) {
+//                neighbors = graph_stream[node.first];
+//                for (auto &neigh : neighbors) {
+//                    // -- loop through timestamps
+//                    neigh.second.erase(std::remove_if(neigh.second.begin(), neigh.second.end(),
+//                                           [&](int time) { return t - time >=  delta; }),
+//                                            neigh.second.end());
+////                    auto neigh_time_it = timestamps.begin();
+////                    while (neigh_time_it != timestamps.end()) {
+////                        if (t - *neigh_time_it < delta) {
+////                            break;
+////                        } else {
+////                            neigh_time_it = timestamps.erase(neigh_time_it);
+////                            // neigh_time_it = timestamps.erase(neigh_time_it);
+////                        }
+////
+////                    }
+//                }
+//            }
+//
+//        }
 
         // -- insert into gs
         graph_stream[u][v].emplace_back(t);
@@ -88,16 +92,17 @@ void Utils::build_oracle(std::string &dataset_path, int delta, std::string &type
         n_min = (du < dv) ? u : v;
         n_max = (du < dv) ? v : u;
 
-        min_neighbors = graph_stream[n_min];
+        min_neighbors = &graph_stream[n_min];
         common_neighs = 0;
 
-        for (const auto &neigh: min_neighbors) {
+        for (const auto &neigh: *min_neighbors) {
             w = neigh.first;
 
             auto n_max_it = graph_stream[n_max].find(w);
             if (n_max_it != graph_stream[n_max].end()) {
                 // -- triangle found
-                std::vector timestamps = n_max_it->second;
+                int timestamps_size = (int) n_max_it->second.size();
+                timestamps = &(n_max_it->second);
 
                 for (int idx_neigh = (int) neigh.second.size() - 1; idx_neigh >= 0; idx_neigh--) {
                     // check times
@@ -105,8 +110,8 @@ void Utils::build_oracle(std::string &dataset_path, int delta, std::string &type
                     if (t - neigh_time >= delta)
                         break;
 
-                    for (int idx = (int) timestamps.size() - 1; idx >= 0; idx--) {
-                        int time = timestamps[idx];
+                    for (int idx = timestamps_size - 1; idx >= 0; idx--) {
+                        int time = (*timestamps)[idx];
                         // check times
                         if (t - time >= delta)
                             break;
