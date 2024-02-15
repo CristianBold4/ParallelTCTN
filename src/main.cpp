@@ -1,5 +1,6 @@
 #include <iostream>
 #include "Utils.h"
+#include "ParallelTCTN.h"
 #include <string>
 #include <cstdlib>
 #include <chrono>
