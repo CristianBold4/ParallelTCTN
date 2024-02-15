@@ -11,6 +11,22 @@
 #include <vector>
 
 #define EdgeSet ankerl::unordered_dense::set<EdgeTemp, hash_edge>
+#define Edge std::pair<int, int>
+
+struct PairEdges {
+    EdgeTemp e;
+    bool weight;
+};
+
+struct hash_pair {
+    size_t operator()(const std::pair<int, int> &p) const {
+        auto hash1 = std::hash<int>{}(p.first);
+        auto hash2 = std::hash<int>{}(p.second);
+
+        return hash1 ^ hash2;
+    }
+};
+
 
 class ParallelTCTN {
 
@@ -24,8 +40,12 @@ class ParallelTCTN {
 
     std::array<double, 8> triangles_estimates_{};
 
+    ankerl::unordered_dense::map<unsigned long long, std::vector<PairEdges>> node_map_ {};
+
     // -- Mersenne Twister RG
     std::mt19937 mt;
+
+    unsigned long long edge_to_id(int u, int v);
 
     void count_triangles(int u, int v, int t);
     static int check_triangle(EdgeTemp e1, EdgeTemp e2, EdgeTemp e3);

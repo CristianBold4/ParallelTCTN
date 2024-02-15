@@ -25,8 +25,6 @@ public:
     static void sort_edgemap(const ankerl::unordered_dense::map<EdgeTemp, int, hash_edge>& map,
                                     std::vector<std::pair<EdgeTemp, int>> &edge_map);
 
-    static void build_oracle(std::string &dataset_path, int delta, std::string &type_oracle,
-                             double perc_retain, std::string &output_path);
 
     static void read_oracle(std::string &oracle_path, EdgeSet &oracle);
 

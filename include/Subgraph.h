@@ -4,15 +4,21 @@
 #include <vector>
 #include <algorithm>
 #include "ankerl/unordered_dense.h"
+#include <iostream>
 
-typedef struct EdgeTemp {
+struct EdgeTemp {
     int u;
     int v;
     int time;
     bool operator==(const EdgeTemp& e) const {
         return ((this->u == e.u) && (this->v == e.v) && (this->time == e.time));
     }
-} EdgeTemp;
+};
+
+//std::ostream& operator<<(std::ostream &os, const EdgeTemp &e) {
+//    os << e.u << " " << e.v << " " << e.time;
+//    return os;
+//}
 
 typedef struct NeighTemp {
     int node;

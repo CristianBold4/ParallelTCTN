@@ -96,7 +96,7 @@ int main(int argc, char** argv) {
         std::ofstream out_file(output_path);
         for (auto cnt : algo.get_triangles_estimates())
             out_file << cnt << " ";
-        out_file << time;
+        out_file << time << "\n";
         out_file.close();
     }
 
