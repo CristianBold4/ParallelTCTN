@@ -1,78 +1,49 @@
-#include "Subgraph.h"
+#include "../include/Subgraph.h"
 
-Subgraph::Subgraph() : num_edges_(0) {};
+void Subgraph::add_edge(const Edge& e, bool heavy) {
 
-Subgraph::~Subgraph() {
-    subgraph_.clear();
+    neighbor n = {e.get_dst(), e.get_time(), true, heavy};
+    subgraph[e.get_src()].emplace_back(n);
+
+    neighbor n_comp = {e.get_src(), e.get_time(), false, heavy};
+    subgraph[e.get_dst()].emplace_back(n_comp);
+
+    size++;
 }
 
-bool Subgraph::add_edge(const EdgeTemp &e, bool heaviness) {
+void Subgraph::subgraph_prune(int curr_time, int delta) {
 
-    int src = e.u;
-    int dst = e.v;
-    int t = e.time;
+    ankerl::unordered_dense::map<int, std::vector<neighbor>> new_subgraph;
+    int new_size = 0;
 
-    NeighTemp nt = { dst, t, heaviness, 1};
-    subgraph_[src].emplace_back(nt);
-    nt = { src, t, heaviness, -1};
-    subgraph_[dst].emplace_back(nt);
+    for(const auto& N: subgraph) {
 
-    num_edges_++;
-    return true;
+        int node = N.first;
+        std::vector<neighbor> neighborhood = N.second;
 
-}
-
-void Subgraph::prune(int curr_time, int delta) {
-
-    ankerl::unordered_dense::map<int, std::vector<NeighTemp>> new_sg;
-    for (auto pair : subgraph_){
-        for (int idx_prune = (int) pair.second.size() - 1; idx_prune >= 0; --idx_prune) {
-            if (curr_time - (pair.second)[idx_prune].timestamp >= delta) {
-                break;
+        for (const neighbor& neigh: neighborhood) {
+            if (curr_time - neigh.time <= delta) {
+                new_subgraph[node].emplace_back(neigh);
+                new_size++;
             }
-            new_sg.emplace(pair);
         }
     }
 
-    this->subgraph_ = new_sg;
-//    for (auto &pair : subgraph_) {
-//        neighbors = &pair.second;
-//        auto neigh_it = neighbors->begin();
-//        while (neigh_it != neighbors->end()) {
-//            if (curr_time - neigh_it->timestamp < delta)
-//                break;
-//            neigh_it = neighbors->erase(neigh_it);
-//        }
-//
-//    }
-
+    this->subgraph = new_subgraph;
+    this->size = new_size/2;
 }
 
+void Subgraph::remove_edge(const Edge& e) {
 
+    if(subgraph.find(e.get_src()) != subgraph.end() &&
+       subgraph.find(e.get_dst()) != subgraph.end()) {
 
-void Subgraph::clear() {
-    subgraph_.clear();
-    num_edges_ = 0;
-}
-
-std::vector<NeighTemp>* Subgraph::return_neighbors(const int u) {
-    return &(subgraph_[u]);
-}
-
-
-int Subgraph::get_degree_node(const int u) {
-
-    auto u_it = nodes_degree_.find(u);
-    if (u_it == nodes_degree_.end()) {
-        return 0;
+        neighbor to_delete = {e.get_dst(), e.get_time(), true};
+        neighbor to_delete_comp = {e.get_src(), e.get_time(), false};
+        subgraph[e.get_src()].erase(std::remove(subgraph[e.get_src()].begin(), subgraph[e.get_src()].end(), to_delete),
+                                    subgraph[e.get_src()].end());
+        subgraph[e.get_dst()].erase(std::remove(subgraph[e.get_dst()].begin(), subgraph[e.get_dst()].end(), to_delete_comp),
+                                    subgraph[e.get_dst()].end());
+        size--;
     }
-    return u_it->second;
-}
-
-int Subgraph::num_nodes() const {
-    return (int) subgraph_.size();
-}
-
-int Subgraph::num_edges() const {
-    return num_edges_;
 }

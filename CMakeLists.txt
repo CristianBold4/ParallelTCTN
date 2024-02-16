@@ -2,42 +2,29 @@ cmake_minimum_required(VERSION 3.16)
 
 find_package(unordered_dense CONFIG REQUIRED)
 
-project(ParallelTCTN)
+project(TCTN)
 
 if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
+	set(CMAKE_BUILD_TYPE Release)
 endif()
 
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_FLAGS "-O3 -march=native")
-# set(CMAKE_CXX_FLAGS_DEBUG "-g")
+set(CMAKE_CXX_FLAGS "-O3")
 
+add_library(utils include/utils.h src/utils.cpp)
+add_library(algorithms include/algorithms.h src/algorithms.cpp)
+add_library(subgraph include/Subgraph.h src/Subgraph.cpp)
+add_library(edge_map include/EdgeMap.h src/EdgeMap.cpp)
+add_library(edge include/Edge.h src/Edge.cpp)
+add_library(nodes_map include/NodesMap.h src/NodesMap.cpp)
 
-add_executable(ParallelTCTN src/main.cpp
-        src/GraphStream.cpp
-        include/GraphStream.h
-        src/Subgraph.cpp
-        include/Subgraph.h
-        src/Utils.cpp
-        include/Utils.h
-        src/ParallelTCTN.cpp
-        include/ParallelTCTN.h
-)
+add_executable(TCTN src/main.cpp)
+add_executable(build_oracle src/build_oracle.cpp)
 
-add_executable(BuildExact src/main.cpp
-        src/GraphStream.cpp
-        include/GraphStream.h
-        src/Subgraph.cpp
-        include/Subgraph.h
-        src/Utils.cpp
-        include/Utils.h
-        src/ParallelTCTN.cpp
-        include/ParallelTCTN.h
-)
-
-target_include_directories(ParallelTCTN PRIVATE include)
-target_include_directories(BuildExact PRIVATE include)
-
-target_link_libraries(ParallelTCTN unordered_dense::unordered_dense)
-target_link_libraries(BuildExact unordered_dense::unordered_dense)
-
+target_link_libraries(edge_map unordered_dense::unordered_dense)
+target_link_libraries(subgraph unordered_dense::unordered_dense)
+target_link_libraries(nodes_map unordered_dense::unordered_dense)
+target_link_libraries(utils edge edge_map)
+target_link_libraries(algorithms utils subgraph nodes_map)
+target_link_libraries(TCTN algorithms)
+target_link_libraries(build_oracle algorithms)

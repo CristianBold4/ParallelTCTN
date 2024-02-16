@@ -1,105 +1,153 @@
-#include <iostream>
-#include "Utils.h"
-#include "ParallelTCTN.h"
-#include <string>
-#include <cstdlib>
-#include <chrono>
-#include <cassert>
+#include "../include/algorithms.h"
 
+int main(int argc, char *argv[]) {
 
-// -- used to retrieve absolute name of the executed program
-char *base_name(char *s)
-{
-    char *start;
-    if ((start = strrchr(s, '/')) == NULL) {
-        start = s;
-    } else {
-        ++start;
-    }
-    return start;
-}
-
-int main(int argc, char** argv) {
-
-    // -- get the last path after backslash
-    char* project = base_name(argv[0]);
-    char delimiter = ' ';
-    int skip = 0;
-    std::cout << "Cpp Version: " << __cplusplus << "\n";
-
-    if (strcmp(project, "BuildExact") == 0) {
-        if (argc != 7) {
-            std::cerr << "Usage: BuildExact (dataset_path) (delta)"
-                         " (type = [Exact, MinDeg]) (retaining_fraction) (exact_output_path) (oracle_output_path)\n";
-            return 0;
-        } else {
-            std::string dataset_path(argv[1]);
-            int delta = atoi(argv[2]);
-            std::string type_oracle(argv[3]);
-            double perc_retain = atof(argv[4]);
-            std::string exact_output_path(argv[5]);
-            std::string oracle_output_path(argv[6]);
-            if (strcmp(type_oracle.c_str(), "Exact") != 0 and strcmp(type_oracle.c_str(), "MinDeg") != 0) {
-                std::cerr << "Build Oracle - Error! Type of Oracle must be Exact or MinDeg.\n";
-                return 0;
-            }
-            auto start = std::chrono::high_resolution_clock::now();
-            Utils::build_ground_truth(dataset_path, delta, type_oracle, perc_retain, exact_output_path, oracle_output_path);
-            auto stop = std::chrono::high_resolution_clock::now();
-            double time = (double) ((std::chrono::duration_cast<std::chrono::milliseconds>(stop - start)).count()) / 1000;
-            std::cout << "Oracle " << type_oracle << " successfully built in time: " << time << " s\n";
-            return 0;
-        }
-
-
+    if(argc < 5) {
+        std::cout << "Usage:\n./TCTN <dataset_path> <delta> exact <output_file>\n"
+                     "./TCTN <dataset_path> <delta> sampling <sampling probability> <trials> <seed> <output_file>\n"
+                     "./TCTN <dataset_path> <delta> oracle <sampling probability> <oracle_file> <trials> <seed> <output_file>\n"
+                  << std::endl;
+        return 1;
     }
 
-    // -- ParallelTCTN
+    std::string dataset_path = argv[1];
+    int delta = std::stoi(argv[2]);
 
-    if (argc != 6) {
-        std::cerr << "Usage: ParallelTCTN (dataset_path) (delta) (p_sampling) "
-                     "(oracle_path) (output_path)\n";
-        return 0;
-    } else {
-        std::string dataset_path (argv[1]);
-        int delta = atoi(argv[2]);
-        double p = atof(argv[3]);
-        std::string oracle_path (argv[4]);
-        std::string output_path (argv[5]);
-        EdgeSet oracle;
-        std::cout << "Reading Oracle...\n";
-        auto start = std::chrono::high_resolution_clock::now();
-        Utils::read_oracle(oracle_path, oracle);
-        auto stop = std::chrono::high_resolution_clock::now();
-        double time = (double) ((std::chrono::duration_cast<std::chrono::milliseconds>(stop - start)).count()) / 1000;
-        std::cout << "Oracle read in time: " << time << " s | Size Oracle = " << oracle.size() << " edges\n";
+    auto start = std::chrono::high_resolution_clock::now();
 
-        // -- run TCTN
-        GraphStream gs (dataset_path, ' ', 0);
-        ParallelTCTN algo (delta, p, oracle);
-        EdgeStream curr;
-        start = std::chrono::high_resolution_clock::now();
-        long nline = 0;
-        while (gs.has_next()) {
-            curr = gs.next();
-            algo.process_edge(curr.u, curr.v, curr.time);
-            nline++;
-            if (nline % 300000 == 0) {
-                std::cout << "Processed " << nline << " edges...\n";
-            }
+    std::string delimiter = " ";
+    auto temporal_edges = load_preprocessed_edges(dataset_path, delimiter);
+
+    auto end = std::chrono::high_resolution_clock::now();
+
+    chrono_t diff = end - start;
+
+    std::cout << "Time to load edges " << diff.count() << std::endl;
+
+
+    std::cout << "Dataset: " << dataset_path << std::endl;
+    std::cout << temporal_edges.size() << " edges loaded" << std::endl;
+    std::cout << "delta : " << delta << " s" << std::endl;
+
+    std::string algorithm = argv[3];
+
+    if(algorithm == "exact") {
+
+        std::cout << "Running exact algorithm" << std::endl;
+
+        std::string exact_out_file = argv[4];
+
+        std::tuple<counts, chrono_t, double, double, EdgeMap> res = exact_algorithm(temporal_edges, delta);
+
+        counts exact_counts = std::get<0>(res);
+        chrono_t exact_time = std::get<1>(res);
+        double exact_avg_memory = std::get<2>(res);
+        double exact_max_memory = std::get<3>(res);
+
+        save_results(exact_counts,
+                     exact_time,
+                     exact_avg_memory,
+                     exact_max_memory,
+                     exact_out_file);
+
+        std::cout << "Exact algorithm done" << std::endl;
+    }
+
+    else if(algorithm == "sampling") {
+
+        if(argc < 8) {
+            std::cout << "Usage:./TCTN <dataset_path> <delta> sampling <sampling probability> <trials> <seed> <output_file>\n";
+            return 1;
         }
 
-        stop = std::chrono::high_resolution_clock::now();
-        time = (double) ((std::chrono::duration_cast<std::chrono::milliseconds>(stop - start)).count()) / 1000;
-        std::cout << "Done!\nTotal Delta-Triangles Instances -> " << algo.get_total_triangles() << "\n";
-        // -- write results
-        std::ofstream out_file(output_path);
-        for (auto cnt : algo.get_triangles_estimates())
-            out_file << cnt << " ";
-        out_file << time << "\n";
-        out_file.close();
+        float p = std::stof(argv[4]);
+        int trials = std::stoi(argv[5]);
+        int seed = std::stoi(argv[6]);
+        std::string sampling_out_file = argv[7];
+
+        std::cout << "Running sampling algorithm" << std::endl;
+        std::cout << "sampling probability: " << p << std::endl;
+        std::cout << "trials: " << trials << std::endl;
+        std::cout << "seed: " << seed << std::endl;
+
+        std::vector<counts > all_sampling_counts;
+        std::vector<chrono_t > all_sampling_times;
+        std::vector<double> all_sampling_avg_memory;
+        std::vector<double> all_sampling_max_memory;
+
+        for (int i = 0; i < trials; i++) {
+
+            std::default_random_engine rand_eng(seed + i);
+
+            auto [sampling_counts,
+                    sampling_time,
+                    sampling_avg_memory,
+                    sampling_max_memory] = sampling_algorithm(temporal_edges, delta, p, rand_eng);
+
+            all_sampling_counts.push_back(sampling_counts);
+            all_sampling_times.push_back(sampling_time);
+            all_sampling_avg_memory.push_back(sampling_avg_memory);
+            all_sampling_max_memory.push_back(sampling_max_memory);
+        }
+
+        save_multiple_results(all_sampling_counts,
+                              all_sampling_times,
+                              all_sampling_avg_memory,
+                              all_sampling_max_memory,
+                              sampling_out_file);
+
+        std::cout << "Sampling algorithm done" << std::endl;
+    }
+
+    else {
+
+        if(argc < 9) {
+            std::cout << "Usage:./TCTN <dataset_path> <delta> oracle <sampling probability> <oracle_file> <trials> <seed> <output_file>\n";
+            return 1;
+        }
+
+        float p = std::stof(argv[4]);
+        std::string oracle_file = argv[5];
+        int trials = std::stoi(argv[6]);
+        int seed = std::stoi(argv[7]);
+        std::string oracle_out_file = argv[8];
+
+        std::cout << "Running oracle algorithm" << std::endl;
+        std::cout << "sampling probability: " << p << std::endl;
+        std::cout << "trials: " << trials << std::endl;
+        std::cout << "seed: " << seed << std::endl;
+
+        std::vector<counts> all_oracle_counts;
+        std::vector<chrono_t> all_oracle_times;
+        std::vector<double> all_oracle_avg_memory;
+        std::vector<double> all_oracle_max_memory;
+        auto oracle = load_oracle(oracle_file);
+        std::cout << "Oracle size " << oracle.size() << std::endl;
+
+        for (int i = 0; i < trials; i++) {
+
+            std::default_random_engine rand_eng(seed + i);
+
+            auto [oracle_counts,
+                    oracle_time,
+                    oracle_avg_memory,
+                    oracle_max_memory] = oracle_algorithm(temporal_edges, delta, p, oracle, rand_eng);
+
+            all_oracle_counts.push_back(oracle_counts);
+            all_oracle_times.push_back(oracle_time);
+            all_oracle_avg_memory.push_back(oracle_avg_memory);
+            all_oracle_max_memory.push_back(oracle_max_memory);
+        }
+
+        save_multiple_results(all_oracle_counts,
+                              all_oracle_times,
+                              all_oracle_avg_memory,
+                              all_oracle_max_memory,
+                              oracle_out_file);
+
+        std::cout << "Oracle algorithm done" << std::endl;
+
     }
 
     return 0;
-
 }
