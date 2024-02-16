@@ -8,7 +8,7 @@
 ParallelTCTN::ParallelTCTN(int delta, double p, EdgeSet &oracle) :
         delta_(delta), p_(p), oracle_(oracle) {}
 
-ParallelTCTN::~ParallelTCTN() { subgraph_.clear(); }
+ParallelTCTN::~ParallelTCTN() { subgraph_map_.clear(); }
 
 std::array<double, 8> ParallelTCTN::get_triangles_estimates() {
     return triangles_estimates_;
@@ -32,11 +32,12 @@ unsigned long long ParallelTCTN::edge_to_id(int u, int v) {
 
 void ParallelTCTN::add_edge_subgraph(int u, int v, int t, bool heaviness) {
     EdgeTemp e = {u, v, t};
-    subgraph_.add_edge(e, heaviness);
-    // -- add to node map
-    unsigned long long id = edge_to_id(u, v);
-    node_map_[id].push_back({{u, v, t }, heaviness});
-    // node_map_[id].push_back({{v, u, t }, heaviness});
+    subgraph_map_.add_edge(e, heaviness);
+//    subgraph_.add_edge(e, heaviness);
+//    // -- add to node map
+//    unsigned long long id = edge_to_id(u, v);
+//    node_map_[id].push_back({{u, v, t }, heaviness});
+//    // node_map_[id].push_back({{v, u, t }, heaviness});
 }
 
 void ParallelTCTN::sample_edge(int u, int v, int t) {
@@ -90,98 +91,205 @@ void ParallelTCTN::count_triangles(int u, int v, int t) {
 
     // -- count triangles
     int du, dv, n_min, n_max, w;
-    du = subgraph_.get_degree_node(u);
-    dv = subgraph_.get_degree_node(v);
+    NeighTempMap neigh_i, neigh_j;
+    du = subgraph_map_.get_degree_node(u);
+    dv = subgraph_map_.get_degree_node(v);
 
     n_min = (du < dv) ? u : v;
     n_max = (du < dv) ? v : u;
 
-    std::vector<NeighTemp> *min_neighbors, *neighbors;
-    NeighTemp neigh_i;
-    std::vector<PairEdges> *pair_edges;
+    ankerl::unordered_dense::map<int, std::vector<NeighTempMap>> *min_neighbors, *neighbors;
+    std::vector<NeighTempMap>* edge_entries;
 
     EdgeTemp e1, e2, e3;
 
-    min_neighbors = subgraph_.return_neighbors(n_min);
+    min_neighbors = subgraph_map_.return_neighbors(n_min);
 
-    for (int n_i_idx = (int) (*min_neighbors).size() - 1; n_i_idx >= 0; --n_i_idx) {
+    for (auto &neigh : *min_neighbors) {
+        w = neigh.first;
+        if (subgraph_map_.find_edge(w, n_max)) {
+            // -- triangles discovered -> retrieve edges
+            edge_entries = subgraph_map_.return_entries_edge(w, n_max);
+            // -- loop edges from n_min - w
+            for (int n_i_idx = (int) (neigh.second.size() - 1); n_i_idx >= 0; --n_i_idx) {
+                neigh_i = neigh.second[n_i_idx];
+                if (t - neigh_i.timestamp >= delta_)
+                    break;
 
-        neigh_i = (*min_neighbors)[n_i_idx];
+                // -- loop edges from w to n_max
+                for (int n_j_idx = (int) (edge_entries->size()) - 1; n_j_idx >= 0; --n_j_idx) {
+                    neigh_j = (*edge_entries)[n_j_idx];
+                    if (t - neigh_j.timestamp >= delta_)
+                        break;
 
-        if (t - neigh_i.timestamp >= delta_)
-            break;
+                    if (neigh_i.timestamp == t || neigh_j.timestamp == t || neigh_i.timestamp == neigh_j.timestamp)
+                        continue;
 
-        w = neigh_i.node;
+                    // -- triangle discovered with correct times
+                    // -- count motifs: we have triangle {n_min, w=neigh_i, n_max=neigh_j}
+                    // -- sort edges by dir
+                    if (neigh_i.dir == 1) {
+                        e1.u = n_min;
+                        e1.v = w;
+                        e1.time = neigh_i.timestamp;
+                    } else {
+                        e1.v = n_min;
+                        e1.u = w;
+                        e1.time = neigh_i.timestamp;
+                    }
+                    // -- sort edges by dir
+                    if (neigh_j.dir == 1) {
+                        e2.u = w;
+                        e2.v = n_max;
+                        e2.time = neigh_j.timestamp;
+                    } else {
+                        e2.v = w;
+                        e2.u = n_max;
+                        e2.time = neigh_j.timestamp;
+                    }
 
-        // neighbors = subgraph_.return_neighbors(w);
-        // assert(edge_to_id(n_max, w) == edge_to_id(w, n_max));
-        pair_edges = &node_map_[edge_to_id(n_max, w)];
-        PairEdges p_e{};
+                    // -- sort edges by dir
+                    if (u == n_min) {
+                        e3.u = n_min;
+                        e3.v = n_max;
+                        e3.time = t;
+                    } else {
+                        e3.v = n_min;
+                        e3.u = n_max;
+                        e3.time = t;
+                    }
 
-        for (int n_j_idx = (int) (*pair_edges).size() - 1; n_j_idx >= 0; --n_j_idx) {
-            // std::cout << (*pair_edges).size();
-            p_e = (*pair_edges)[n_j_idx];
-            if (t - p_e.e.time >= delta_)
-                break;
+//                    std::cout << e1.u << " " << e1.v << " "
+//                              << e2.u << " " << e2.v << " "
+//                              << e3.u << " " << e3.v << "\n";
 
-            if (neigh_i.timestamp == p_e.e.time || neigh_i.timestamp == t || p_e.e.time == t)
-                continue;
+                    // -- get motif idx
+                    int motif_idx;
 
-            // std::cout << "Right Triangle cntd\n";
+                    if (e1.time < e2.time)
+                        motif_idx = check_triangle(e1, e2, e3);
+                    else
+                        motif_idx = check_triangle(e2, e1, e3);
 
-            // -- count motifs: we have triangle {n_min, w=neigh_i, n_max=neigh_j}
-            // -- sort edges by dir
-            if (neigh_i.dir == 1) {
-                e1.u = n_min;
-                e1.v = w;
-                e1.time = neigh_i.timestamp;
-            } else {
-                e1.v = n_min;
-                e1.u = w;
-                e1.time = neigh_i.timestamp;
-            }
-            // -- sort edges by dir
-            e2 = p_e.e;
-            // std::cout << e2.u << " " << e2.v << " " << e2.time << "\n";
+                    // assert(motif_idx != -1);
+                    if (motif_idx != -1) {
+                        bool h_i = neigh_i.weight;
+                        bool h_j = neigh_j.weight;
+                        double increment = 1.0;
+                        if (!h_i and !h_j)
+                            increment = 1.0 / (p_ * p_);
+                        else if (!h_i or !h_j)
+                            increment = 1.0 / (p_);
 
-            // -- sort edges by dir
-            if (u == n_min) {
-                e3.u = n_min;
-                e3.v = n_max;
-                e3.time = t;
-            } else {
-                e3.v = n_min;
-                e3.u = n_max;
-                e3.time = t;
-            }
+                        triangles_estimates_[motif_idx] += increment;
+                    }
 
-            // -- get motif idx
-            int motif_idx;
 
-            if (e1.time < e2.time)
-                motif_idx = check_triangle(e1, e2, e3);
-            else
-                motif_idx = check_triangle(e2, e1, e3);
-
-            // assert(motif_idx != -1);
-            if (motif_idx != -1) {
-                bool h_i = neigh_i.weight;
-                bool h_j = p_e.weight;
-                double increment = 1.0;
-                if (!h_i and !h_j)
-                    increment = 1.0 / (p_ * p_);
-                else if (!h_i or !h_j)
-                    increment = 1.0 / (p_);
-
-                triangles_estimates_[motif_idx] += increment;
+                }
             }
 
         }
 
-
     }
 
 }
+
+//void ParallelTCTN::count_triangles(int u, int v, int t) {
+//
+//    // -- count triangles
+//    int du, dv, n_min, n_max, w;
+//    du = subgraph_.get_degree_node(u);
+//    dv = subgraph_.get_degree_node(v);
+//
+//    n_min = (du < dv) ? u : v;
+//    n_max = (du < dv) ? v : u;
+//
+//    std::vector<NeighTemp> *min_neighbors, *neighbors;
+//    NeighTemp neigh_i;
+//    std::vector<PairEdges> *pair_edges;
+//
+//    EdgeTemp e1, e2, e3;
+//
+//    min_neighbors = subgraph_.return_neighbors(n_min);
+//
+//    for (int n_i_idx = (int) (*min_neighbors).size() - 1; n_i_idx >= 0; --n_i_idx) {
+//
+//        neigh_i = (*min_neighbors)[n_i_idx];
+//
+//        if (t - neigh_i.timestamp >= delta_)
+//            break;
+//
+//        w = neigh_i.node;
+//
+//        // neighbors = subgraph_.return_neighbors(w);
+//        // assert(edge_to_id(n_max, w) == edge_to_id(w, n_max));
+//        pair_edges = &node_map_[edge_to_id(n_max, w)];
+//        PairEdges p_e{};
+//
+//        for (int n_j_idx = (int) (*pair_edges).size() - 1; n_j_idx >= 0; --n_j_idx) {
+//            // std::cout << (*pair_edges).size();
+//            p_e = (*pair_edges)[n_j_idx];
+//            if (t - p_e.e.time >= delta_)
+//                break;
+//
+//            if (neigh_i.timestamp == p_e.e.time || neigh_i.timestamp == t || p_e.e.time == t)
+//                continue;
+//
+//            // std::cout << "Right Triangle cntd\n";
+//
+//            // -- count motifs: we have triangle {n_min, w=neigh_i, n_max=neigh_j}
+//            // -- sort edges by dir
+//            if (neigh_i.dir == 1) {
+//                e1.u = n_min;
+//                e1.v = w;
+//                e1.time = neigh_i.timestamp;
+//            } else {
+//                e1.v = n_min;
+//                e1.u = w;
+//                e1.time = neigh_i.timestamp;
+//            }
+//            // -- sort edges by dir
+//            e2 = p_e.e;
+//            // std::cout << e2.u << " " << e2.v << " " << e2.time << "\n";
+//
+//            // -- sort edges by dir
+//            if (u == n_min) {
+//                e3.u = n_min;
+//                e3.v = n_max;
+//                e3.time = t;
+//            } else {
+//                e3.v = n_min;
+//                e3.u = n_max;
+//                e3.time = t;
+//            }
+//
+//            // -- get motif idx
+//            int motif_idx;
+//
+//            if (e1.time < e2.time)
+//                motif_idx = check_triangle(e1, e2, e3);
+//            else
+//                motif_idx = check_triangle(e2, e1, e3);
+//
+//            // assert(motif_idx != -1);
+//            if (motif_idx != -1) {
+//                bool h_i = neigh_i.weight;
+//                bool h_j = p_e.weight;
+//                double increment = 1.0;
+//                if (!h_i and !h_j)
+//                    increment = 1.0 / (p_ * p_);
+//                else if (!h_i or !h_j)
+//                    increment = 1.0 / (p_);
+//
+//                triangles_estimates_[motif_idx] += increment;
+//            }
+//
+//        }
+//
+//
+//    }
+//
+//}
 
 void ParallelTCTN::process_edge(const int u, const int v, const int t) {
 
@@ -207,17 +315,17 @@ void ParallelTCTN::prune() {
 
     // std::cout << "Pruning...\n";
 
-    subgraph_.prune(curr_time_, delta_);
-    // -- node map prune
-    ankerl::unordered_dense::map<unsigned long long, std::vector<PairEdges>> new_nm;
-    for (const auto& pair : node_map_){
-        for (int idx_prune = (int) pair.second.size() - 1; idx_prune >= 0; --idx_prune) {
-            if (curr_time_ - (pair.second)[idx_prune].e.time >= delta_)
-                break;
-            new_nm.emplace(pair);
-        }
-    }
-    this->node_map_ = new_nm;
+    subgraph_map_.prune(curr_time_, delta_);
+//    // -- node map prune
+//    ankerl::unordered_dense::map<unsigned long long, std::vector<PairEdges>> new_nm;
+//    for (const auto& pair : node_map_){
+//        for (int idx_prune = (int) pair.second.size() - 1; idx_prune >= 0; --idx_prune) {
+//            if (curr_time_ - (pair.second)[idx_prune].e.time >= delta_)
+//                break;
+//            new_nm.emplace(pair);
+//        }
+//    }
+//    this->node_map_ = new_nm;
 }
 
 

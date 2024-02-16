@@ -5,26 +5,18 @@
 #ifndef PARALLEL_TCTN_ALGO_H
 #define PARALLEL_TCTN_ALGO_H
 
-#include "Subgraph.h"
+// #include "Subgraph.h"
+#include "SubgraphMap.h"
 #include <ankerl/unordered_dense.h>
 #include <random>
 #include <vector>
+#include "hashing.h"
 
 #define EdgeSet ankerl::unordered_dense::set<EdgeTemp, hash_edge>
-#define Edge std::pair<int, int>
 
 struct PairEdges {
     EdgeTemp e;
     bool weight;
-};
-
-struct hash_pair {
-    size_t operator()(const std::pair<int, int> &p) const {
-        auto hash1 = std::hash<int>{}(p.first);
-        auto hash2 = std::hash<int>{}(p.second);
-
-        return hash1 ^ hash2;
-    }
 };
 
 
@@ -36,11 +28,12 @@ class ParallelTCTN {
     int delta_;
     // -- oracle
     EdgeSet oracle_;
-    Subgraph subgraph_{};
+    // Subgraph subgraph_{};
+    SubgraphMap subgraph_map_{};
 
     std::array<double, 8> triangles_estimates_{};
 
-    ankerl::unordered_dense::map<unsigned long long, std::vector<PairEdges>> node_map_ {};
+    // ankerl::unordered_dense::map<unsigned long long, std::vector<PairEdges>> node_map_ {};
 
     // -- Mersenne Twister RG
     std::mt19937 mt;

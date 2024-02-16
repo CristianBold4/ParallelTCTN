@@ -16,12 +16,12 @@ set(CMAKE_CXX_FLAGS "-O3 -march=native")
 add_executable(ParallelTCTN src/main.cpp
         src/GraphStream.cpp
         include/GraphStream.h
-        src/Subgraph.cpp
-        include/Subgraph.h
         src/Utils.cpp
         include/Utils.h
         src/ParallelTCTN.cpp
         include/ParallelTCTN.h
+        src/SubgraphMap.cpp
+        include/SubgraphMap.h
 )
 
 add_executable(BuildExact src/main.cpp
@@ -33,6 +33,9 @@ add_executable(BuildExact src/main.cpp
         include/Utils.h
         src/ParallelTCTN.cpp
         include/ParallelTCTN.h
+        src/SubgraphMap.cpp
+        include/SubgraphMap.h
+        include/hashing.h
 )
 
 target_include_directories(ParallelTCTN PRIVATE include)

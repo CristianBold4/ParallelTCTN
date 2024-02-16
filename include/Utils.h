@@ -8,7 +8,8 @@
 #include <sstream>
 #include "ankerl/unordered_dense.h"
 #include "GraphStream.h"
-#include "Subgraph.h"
+#include "ParallelTCTN.h"
+
 
 #define EdgeSet ankerl::unordered_dense::set<EdgeTemp, hash_edge>
 
