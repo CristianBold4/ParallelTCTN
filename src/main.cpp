@@ -1,153 +1,205 @@
-#include "../include/algorithms.h"
+#include <iostream>
+#include "GraphStream.h"
+#include "Utils.h"
+#include "WRPSampling.h"
+#include <string>
+#include <cstdio>
+#include <cstdlib>
+#include <chrono>
+#include <cassert>
+#include <omp.h>
 
-int main(int argc, char *argv[]) {
+WRPSampling wrp_sampling(const std::string &filename, const char &delimiter, int skip, int memory_budget,
+                         int random_seed, double alpha, double beta,
+                         const ankerl::unordered_dense::map<long, int> &heaviness_oracle) {
 
-    if(argc < 5) {
-        std::cout << "Usage:\n./TCTN <dataset_path> <delta> exact <output_file>\n"
-                     "./TCTN <dataset_path> <delta> sampling <sampling probability> <trials> <seed> <output_file>\n"
-                     "./TCTN <dataset_path> <delta> oracle <sampling probability> <oracle_file> <trials> <seed> <output_file>\n"
-                  << std::endl;
-        return 1;
-    }
+    GraphStream graph_stream(filename, delimiter, skip);
 
-    std::string dataset_path = argv[1];
-    int delta = std::stoi(argv[2]);
+    WRPSampling WRP_algo(memory_budget, random_seed, alpha, beta, heaviness_oracle);
+    long t = 0;
 
-    auto start = std::chrono::high_resolution_clock::now();
+    while (graph_stream.has_next()) {
 
-    std::string delimiter = " ";
-    auto temporal_edges = load_preprocessed_edges(dataset_path, delimiter);
+        EdgeStream current_edge = graph_stream.next();
 
-    auto end = std::chrono::high_resolution_clock::now();
-
-    chrono_t diff = end - start;
-
-    std::cout << "Time to load edges " << diff.count() << std::endl;
-
-
-    std::cout << "Dataset: " << dataset_path << std::endl;
-    std::cout << temporal_edges.size() << " edges loaded" << std::endl;
-    std::cout << "delta : " << delta << " s" << std::endl;
-
-    std::string algorithm = argv[3];
-
-    if(algorithm == "exact") {
-
-        std::cout << "Running exact algorithm" << std::endl;
-
-        std::string exact_out_file = argv[4];
-
-        std::tuple<counts, chrono_t, double, double, EdgeMap> res = exact_algorithm(temporal_edges, delta);
-
-        counts exact_counts = std::get<0>(res);
-        chrono_t exact_time = std::get<1>(res);
-        double exact_avg_memory = std::get<2>(res);
-        double exact_max_memory = std::get<3>(res);
-
-        save_results(exact_counts,
-                     exact_time,
-                     exact_avg_memory,
-                     exact_max_memory,
-                     exact_out_file);
-
-        std::cout << "Exact algorithm done" << std::endl;
-    }
-
-    else if(algorithm == "sampling") {
-
-        if(argc < 8) {
-            std::cout << "Usage:./TCTN <dataset_path> <delta> sampling <sampling probability> <trials> <seed> <output_file>\n";
-            return 1;
+        WRP_algo.process_edge(current_edge.u, current_edge.v);
+        t++;
+        // -- output log
+        if (t % 5000000 == 0) {
+            std::cout << "Processed " << t << " edges || Estimated count T = " << WRP_algo.get_global_triangles()
+                      << "\n";
         }
-
-        float p = std::stof(argv[4]);
-        int trials = std::stoi(argv[5]);
-        int seed = std::stoi(argv[6]);
-        std::string sampling_out_file = argv[7];
-
-        std::cout << "Running sampling algorithm" << std::endl;
-        std::cout << "sampling probability: " << p << std::endl;
-        std::cout << "trials: " << trials << std::endl;
-        std::cout << "seed: " << seed << std::endl;
-
-        std::vector<counts > all_sampling_counts;
-        std::vector<chrono_t > all_sampling_times;
-        std::vector<double> all_sampling_avg_memory;
-        std::vector<double> all_sampling_max_memory;
-
-        for (int i = 0; i < trials; i++) {
-
-            std::default_random_engine rand_eng(seed + i);
-
-            auto [sampling_counts,
-                    sampling_time,
-                    sampling_avg_memory,
-                    sampling_max_memory] = sampling_algorithm(temporal_edges, delta, p, rand_eng);
-
-            all_sampling_counts.push_back(sampling_counts);
-            all_sampling_times.push_back(sampling_time);
-            all_sampling_avg_memory.push_back(sampling_avg_memory);
-            all_sampling_max_memory.push_back(sampling_max_memory);
-        }
-
-        save_multiple_results(all_sampling_counts,
-                              all_sampling_times,
-                              all_sampling_avg_memory,
-                              all_sampling_max_memory,
-                              sampling_out_file);
-
-        std::cout << "Sampling algorithm done" << std::endl;
-    }
-
-    else {
-
-        if(argc < 9) {
-            std::cout << "Usage:./TCTN <dataset_path> <delta> oracle <sampling probability> <oracle_file> <trials> <seed> <output_file>\n";
-            return 1;
-        }
-
-        float p = std::stof(argv[4]);
-        std::string oracle_file = argv[5];
-        int trials = std::stoi(argv[6]);
-        int seed = std::stoi(argv[7]);
-        std::string oracle_out_file = argv[8];
-
-        std::cout << "Running oracle algorithm" << std::endl;
-        std::cout << "sampling probability: " << p << std::endl;
-        std::cout << "trials: " << trials << std::endl;
-        std::cout << "seed: " << seed << std::endl;
-
-        std::vector<counts> all_oracle_counts;
-        std::vector<chrono_t> all_oracle_times;
-        std::vector<double> all_oracle_avg_memory;
-        std::vector<double> all_oracle_max_memory;
-        auto oracle = load_oracle(oracle_file);
-        std::cout << "Oracle size " << oracle.size() << std::endl;
-
-        for (int i = 0; i < trials; i++) {
-
-            std::default_random_engine rand_eng(seed + i);
-
-            auto [oracle_counts,
-                    oracle_time,
-                    oracle_avg_memory,
-                    oracle_max_memory] = oracle_algorithm(temporal_edges, delta, p, oracle, rand_eng);
-
-            all_oracle_counts.push_back(oracle_counts);
-            all_oracle_times.push_back(oracle_time);
-            all_oracle_avg_memory.push_back(oracle_avg_memory);
-            all_oracle_max_memory.push_back(oracle_max_memory);
-        }
-
-        save_multiple_results(all_oracle_counts,
-                              all_oracle_times,
-                              all_oracle_avg_memory,
-                              all_oracle_max_memory,
-                              oracle_out_file);
-
-        std::cout << "Oracle algorithm done" << std::endl;
 
     }
 
+    return WRP_algo;
+
+}
+
+/* Use if POSIX basename() is unavailable */
+char *base_name(char *s)
+{
+    char *start;
+
+    /* Find the last '/', and move past it if there is one.  Otherwise return
+       a copy of the whole string. */
+    /* strrchr() finds the last place where the given character is in a given
+       string.  Returns NULL if not found. */
+    if ((start = strrchr(s, '/')) == NULL) {
+        start = s;
+    } else {
+        ++start;
+    }
+    /* If you don't want to do anything interesting with the returned value,
+       i.e., if you just want to print it for example, you can just return
+       'start' here (and then you don't need dup_str(), or to free
+       the result). */
+    return start;
+}
+
+int main(int argc, char **argv) {
+
+    // -- get the last path after backslash
+    char* project = base_name(argv[0]);
+    char delimiter;
+    int skip;
+    if (strcmp(project, "DataPreprocessing") == 0) {
+        if (argc != 5) {
+            std::cerr << "Usage: DataPreprocessing (dataset_path) (delimiter) (skip)"
+                         " (output_path)\n";
+            return 0;
+        } else {
+            std::string dataset_path(argv[1]);
+            char* delim = (argv[2]);
+            // delimiter = ' ';
+            skip = atoi(argv[3]);
+            std::string output_path(argv[4]);
+            auto start = std::chrono::high_resolution_clock::now();
+            Utils::preprocess_data(dataset_path, delim, skip, output_path);
+            auto stop = std::chrono::high_resolution_clock::now();
+            double time = (double) ((std::chrono::duration_cast<std::chrono::milliseconds>(stop - start)).count()) / 1000;
+            std::cout << "Dataset preprocessed in time: " << time << " s\n";
+            return 0;
+
+        }
+
+    }
+
+    if (strcmp(project, "BuildOracle") == 0) {
+        if (argc != 7) {
+            std::cerr << "Usage: BuildOracle (dataset_path) (delimiter) (skip)"
+                         " (type = [Exact, MinDeg]) (retaining_fraction) (output_path)\n";
+            return 0;
+        } else {
+            std::string dataset_path(argv[1]);
+            delimiter = *(argv[2]);
+            skip = atoi(argv[3]);
+            std::string type_oracle(argv[4]);
+            double perc_retain = atof(argv[5]);
+            std::string output_path(argv[6]);
+            if (strcmp(type_oracle.c_str(), "Exact") != 0 and strcmp(type_oracle.c_str(), "MinDeg") != 0) {
+                std::cerr << "Build Oracle - Error! Type of Oracle must be Exact or MinDeg.\n";
+                return 0;
+            }
+            auto start = std::chrono::high_resolution_clock::now();
+            Utils::build_oracle(dataset_path, delimiter, skip, type_oracle, output_path, perc_retain);
+            auto stop = std::chrono::high_resolution_clock::now();
+            double time = (double) ((std::chrono::duration_cast<std::chrono::milliseconds>(stop - start)).count()) / 1000;
+            std::cout << "Oracle " << type_oracle << " successfully built in time: " << time << " s\n";
+            return 0;
+        }
+
+
+    }
+
+    if (argc < 8) {
+        std::cerr << "Usage: Tonic (random_seed) (memory_budget) (alpha)"
+                     " (beta) (dataset_path) (output_path) ([list of oracles...])\n";
+        return 0;
+    }
+
+    int random_seed = atoi(argv[1]);
+    long memory_budget = atol(argv[2]);
+    double alpha = atof(argv[3]);
+    double beta = atof(argv[4]);
+
+    srand(random_seed);
+    std::string filename(argv[5]);
+
+    // -- by default, since the data should have been preprocessed, delimiter = ' ', number of lines to be skipped = 0
+    // -- change here if you have other types of input datasets !!
+    delimiter = ' ';
+    skip = 0;
+    std::string out_path(argv[6]);
+
+
+    int n_oracles = (argc - 7);
+    std::vector<std::string> oracle_list;
+    for (int idx_oracle=7; idx_oracle < argc; idx_oracle++) {
+	std::string oracle_filename(argv[idx_oracle]);
+	oracle_list.push_back(oracle_filename);
+	std::cout << oracle_list[idx_oracle - 7] << "\n";
+    }
+
+
+    std::vector<double> partial_results;
+    std::vector<double> partial_times;
+
+    omp_set_dynamic(0);
+    omp_set_num_threads(n_oracles);
+
+    #pragma omp parallel for
+    for (auto oracle_path : oracle_list){
+    
+	    // -- read oracle
+	    ankerl::unordered_dense::map<long, int> heaviness_oracle;
+	    auto start = std::chrono::high_resolution_clock::now();
+	    Utils::read_oracle(oracle_path, delimiter, skip, heaviness_oracle);
+	    auto stop = std::chrono::high_resolution_clock::now();
+		    
+	    double time = (double) ((std::chrono::duration_cast<std::chrono::milliseconds>(stop - start)).count()) / 1000;
+	    std::cout << "Oracle " << oracle_path << " successfully read in time: " << time << " s\n";
+	    // -- run main algo
+	    start = std::chrono::high_resolution_clock::now();
+	    WRPSampling WRP_algo = wrp_sampling(filename, delimiter, skip, memory_budget, random_seed, alpha, beta,
+                                       heaviness_oracle);
+	    stop = std::chrono::high_resolution_clock::now();
+	    time = (double) ((std::chrono::duration_cast<std::chrono::milliseconds>(stop - start)).count()) / 1000;
+	    
+	    // -- write results
+	    double global_count = WRP_algo.get_global_triangles();
+	    partial_results.push_back(global_count); 
+	    partial_times.push_back(time);
+	    
+	    
+	    std::cout << "# Thread " << omp_get_thread_num() << "---> Estimated global count: " << global_count <<
+		         " || Cpu Time elapsed: " << time << " s\n";
+    }
+
+
+    // -- output_files
+    std::ofstream outFile(out_path + "_global_count.txt");
+    // std::ofstream outFile_local(out_path + "_local_counts.txt");
+
+
+    for (int idx=0; idx < partial_results.size(); idx++)
+    	outFile << "Global Count: " << std::fixed << partial_results[idx] << "\nTime Elapsed: " << partial_times[idx] << "(s)\n";
+
+    /*
+    ankerl::unordered_dense::map<int, double> local_triangles;
+    WRP_algo.get_local_triangles_map(local_triangles);
+    outFile_local << "Local Triangles Counts:\n";
+    for (auto &node_to_triangle: local_triangles) {
+        outFile_local << node_to_triangle.first << "\t" << std::fixed << node_to_triangle.second << "\n";
+    }
+    */
+
+
+    outFile.close();
+    // outFile_local.close();
+
+    
     return 0;
+
+
 }
