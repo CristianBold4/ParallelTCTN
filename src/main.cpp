@@ -9,36 +9,81 @@
 #include <cassert>
 #include <omp.h>
 
-WRPSampling wrp_sampling(const std::string &filename, const char &delimiter, int skip, int memory_budget,
-                         int random_seed, double alpha, double beta,
-                         const ankerl::unordered_dense::map<long, int> &heaviness_oracle) {
+void wrp_sampling_parallel(const std::string &filename, const char &delimiter, int skip, int memory_budget,
+                           int random_seed, double alpha, double beta,
+                           const std::vector<std::string> &oracle_list, std::string &out_path) {
+
+    const int n_oracles = (int) oracle_list.size();
+    std::vector<WRPSampling> Tonic_algos;
+
+    omp_set_dynamic(0);
+    omp_set_num_threads(n_oracles);
+
+    // -- output_files
+    std::ofstream outFile(out_path + "_global_count.txt");
+
+    #pragma omp parallel for
+    for (auto oracle_path: oracle_list) {
+        // -- read oracle
+        ankerl::unordered_dense::map<long, int> heaviness_oracle;
+        auto start = std::chrono::high_resolution_clock::now();
+        Utils::read_oracle(oracle_path, delimiter, skip, heaviness_oracle);
+        auto stop = std::chrono::high_resolution_clock::now();
+        double time = (double) ((std::chrono::duration_cast<std::chrono::milliseconds>(stop - start)).count()) / 1000;
+        std::cout << "# Thread " << omp_get_thread_num() <<
+                  " || Oracle " << oracle_path << " successfully read in time: " << time << " s\n";
+        Tonic_algos.emplace_back(memory_budget, random_seed, alpha, beta, heaviness_oracle);
+    }
 
     GraphStream graph_stream(filename, delimiter, skip);
-
-    WRPSampling WRP_algo(memory_budget, random_seed, alpha, beta, heaviness_oracle);
+    std::cout << "Stream successfully read\n";
+    std::vector<EdgeStream> stream = graph_stream.get_edges();
     long t = 0;
+    int i = 0;
 
-    while (graph_stream.has_next()) {
+    std::chrono::high_resolution_clock::time_point start, stop;
+    double time;
 
-        EdgeStream current_edge = graph_stream.next();
+    auto total_start = std::chrono::high_resolution_clock::now();
 
-        WRP_algo.process_edge(current_edge.u, current_edge.v);
-        t++;
-        // -- output log
-        if (t % 5000000 == 0) {
-            std::cout << "Processed " << t << " edges || Estimated count T = " << WRP_algo.get_global_triangles()
-                      << "\n";
+    #pragma omp parallel for private(i, t, start, stop, time)
+    for (auto WRP_algo: Tonic_algos) {
+
+        start = std::chrono::high_resolution_clock::now();
+        for (i = 0; i < stream.size(); i++) {
+            WRP_algo.process_edge(stream[i].u, stream[i].v);
+            t++;
+            // -- output log
+            if (t % 5000000 == 0) {
+                std::cout << "# Thread " << omp_get_thread_num() <<
+                          " || Processed " << t << " edges || Estimated count T = " <<
+                          WRP_algo.get_global_triangles() << "\n";
+            }
         }
+        stop = std::chrono::high_resolution_clock::now();
+        time = (double) ((std::chrono::duration_cast<std::chrono::milliseconds>(stop - start)).count()) / 1000;
+
+        // -- write results
+        double global_count = WRP_algo.get_global_triangles();
+
+        std::cout << "# Thread " << omp_get_thread_num() << "---> Estimated global count: " << global_count <<
+                  " || Cpu Time elapsed: " << time << " s\n";
+
+        outFile << "# Thread " << omp_get_thread_num() << " || Global Count: " << std::fixed << global_count
+                << "\nTime Elapsed: " << time << "(s)\n";
 
     }
 
-    return WRP_algo;
+    auto total_stop = std::chrono::high_resolution_clock::now();
+    double total_time =
+            (double) ((std::chrono::duration_cast<std::chrono::milliseconds>(total_stop - total_start)).count()) / 1000;
+
+    outFile.close();
 
 }
 
 /* Use if POSIX basename() is unavailable */
-char *base_name(char *s)
-{
+char *base_name(char *s) {
     char *start;
 
     /* Find the last '/', and move past it if there is one.  Otherwise return
@@ -60,7 +105,7 @@ char *base_name(char *s)
 int main(int argc, char **argv) {
 
     // -- get the last path after backslash
-    char* project = base_name(argv[0]);
+    char *project = base_name(argv[0]);
     char delimiter;
     int skip;
     if (strcmp(project, "DataPreprocessing") == 0) {
@@ -70,14 +115,15 @@ int main(int argc, char **argv) {
             return 0;
         } else {
             std::string dataset_path(argv[1]);
-            char* delim = (argv[2]);
+            char *delim = (argv[2]);
             // delimiter = ' ';
             skip = atoi(argv[3]);
             std::string output_path(argv[4]);
             auto start = std::chrono::high_resolution_clock::now();
             Utils::preprocess_data(dataset_path, delim, skip, output_path);
             auto stop = std::chrono::high_resolution_clock::now();
-            double time = (double) ((std::chrono::duration_cast<std::chrono::milliseconds>(stop - start)).count()) / 1000;
+            double time =
+                    (double) ((std::chrono::duration_cast<std::chrono::milliseconds>(stop - start)).count()) / 1000;
             std::cout << "Dataset preprocessed in time: " << time << " s\n";
             return 0;
 
@@ -104,7 +150,8 @@ int main(int argc, char **argv) {
             auto start = std::chrono::high_resolution_clock::now();
             Utils::build_oracle(dataset_path, delimiter, skip, type_oracle, output_path, perc_retain);
             auto stop = std::chrono::high_resolution_clock::now();
-            double time = (double) ((std::chrono::duration_cast<std::chrono::milliseconds>(stop - start)).count()) / 1000;
+            double time =
+                    (double) ((std::chrono::duration_cast<std::chrono::milliseconds>(stop - start)).count()) / 1000;
             std::cout << "Oracle " << type_oracle << " successfully built in time: " << time << " s\n";
             return 0;
         }
@@ -119,7 +166,7 @@ int main(int argc, char **argv) {
     }
 
     int random_seed = atoi(argv[1]);
-    long memory_budget = atol(argv[2]);
+    int memory_budget = atoi(argv[2]);
     double alpha = atof(argv[3]);
     double beta = atof(argv[4]);
 
@@ -135,71 +182,17 @@ int main(int argc, char **argv) {
 
     int n_oracles = (argc - 7);
     std::vector<std::string> oracle_list;
-    for (int idx_oracle=7; idx_oracle < argc; idx_oracle++) {
-	std::string oracle_filename(argv[idx_oracle]);
-	oracle_list.push_back(oracle_filename);
-	std::cout << oracle_list[idx_oracle - 7] << "\n";
+    for (int idx_oracle = 7; idx_oracle < argc; idx_oracle++) {
+        std::string oracle_filename(argv[idx_oracle]);
+        oracle_list.push_back(oracle_filename);
+        std::cout << oracle_list[idx_oracle - 7] << "\n";
     }
 
+    // -- run main algo
+    wrp_sampling_parallel(filename, delimiter, skip, memory_budget, random_seed, alpha, beta,
+                          oracle_list, out_path);
 
-    std::vector<double> partial_results;
-    std::vector<double> partial_times;
-
-    omp_set_dynamic(0);
-    omp_set_num_threads(n_oracles);
-
-    #pragma omp parallel for
-    for (auto oracle_path : oracle_list){
-    
-	    // -- read oracle
-	    ankerl::unordered_dense::map<long, int> heaviness_oracle;
-	    auto start = std::chrono::high_resolution_clock::now();
-	    Utils::read_oracle(oracle_path, delimiter, skip, heaviness_oracle);
-	    auto stop = std::chrono::high_resolution_clock::now();
-		    
-	    double time = (double) ((std::chrono::duration_cast<std::chrono::milliseconds>(stop - start)).count()) / 1000;
-	    std::cout << "Oracle " << oracle_path << " successfully read in time: " << time << " s\n";
-	    // -- run main algo
-	    start = std::chrono::high_resolution_clock::now();
-	    WRPSampling WRP_algo = wrp_sampling(filename, delimiter, skip, memory_budget, random_seed, alpha, beta,
-                                       heaviness_oracle);
-	    stop = std::chrono::high_resolution_clock::now();
-	    time = (double) ((std::chrono::duration_cast<std::chrono::milliseconds>(stop - start)).count()) / 1000;
-	    
-	    // -- write results
-	    double global_count = WRP_algo.get_global_triangles();
-	    partial_results.push_back(global_count); 
-	    partial_times.push_back(time);
-	    
-	    
-	    std::cout << "# Thread " << omp_get_thread_num() << "---> Estimated global count: " << global_count <<
-		         " || Cpu Time elapsed: " << time << " s\n";
-    }
-
-
-    // -- output_files
-    std::ofstream outFile(out_path + "_global_count.txt");
-    // std::ofstream outFile_local(out_path + "_local_counts.txt");
-
-
-    for (int idx=0; idx < partial_results.size(); idx++)
-    	outFile << "Global Count: " << std::fixed << partial_results[idx] << "\nTime Elapsed: " << partial_times[idx] << "(s)\n";
-
-    /*
-    ankerl::unordered_dense::map<int, double> local_triangles;
-    WRP_algo.get_local_triangles_map(local_triangles);
-    outFile_local << "Local Triangles Counts:\n";
-    for (auto &node_to_triangle: local_triangles) {
-        outFile_local << node_to_triangle.first << "\t" << std::fixed << node_to_triangle.second << "\n";
-    }
-    */
-
-
-    outFile.close();
-    // outFile_local.close();
-
-    
     return 0;
 
-
 }
+

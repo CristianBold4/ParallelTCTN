@@ -24,18 +24,15 @@ public:
 
     // -- methods
     void read_chunk();
-    EdgeStream next();
+    inline std::vector<EdgeStream> get_edges() { return stream_vector_; }
 
-    inline bool has_next() {
-        return !chunk_queue_.empty();
-    }
 
 private:
 
     std::ifstream graph_stream_;
     char delimiter_;
     int skip_;
-    std::queue<EdgeStream> chunk_queue_;
+    std::vector<EdgeStream> stream_vector_;
 
 };
 

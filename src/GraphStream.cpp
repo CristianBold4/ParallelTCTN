@@ -29,7 +29,7 @@ void GraphStream::read_chunk() {
     long nline = 0;
 
     // -- read chunk
-    while(nline++ < CHUNK_SIZE && std::getline(graph_stream_, line)) {
+    while(std::getline(graph_stream_, line)) {
 
         std::stringstream ss(line);
 
@@ -44,21 +44,8 @@ void GraphStream::read_chunk() {
         edge.u = u;
         edge.v = v;
         edge.time = time;
-        chunk_queue_.push(edge);
+        stream_vector_.emplace_back(edge);
 
     }
-
-}
-
-EdgeStream GraphStream::next() {
-
-    if (chunk_queue_.size() <= 1) {
-        read_chunk();
-    }
-
-    EdgeStream edge =  chunk_queue_.front();
-    chunk_queue_.pop();
-
-    return edge;
 
 }
