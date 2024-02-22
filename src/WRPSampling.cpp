@@ -30,6 +30,7 @@ WRPSampling::WRPSampling(long k, int random_seed, double alpha, double beta,
     set_edges_ids_.reserve(k);
     e2 = std::mt19937(random_seed);
 
+    std::cout << "Done!\n" << std::flush;
 }
 
 double WRPSampling::get_global_triangles() const {

@@ -15,6 +15,7 @@ void wrp_sampling_parallel(const std::string &filename, const char &delimiter, i
 
     const int n_oracles = (int) oracle_list.size();
     std::vector<WRPSampling> Tonic_algos;
+    Tonic_algos.reserve(n_oracles);
 
     omp_set_dynamic(0);
     omp_set_num_threads(n_oracles);
@@ -22,35 +23,36 @@ void wrp_sampling_parallel(const std::string &filename, const char &delimiter, i
     // -- output_files
     std::ofstream outFile(out_path + "_global_count.txt");
 
+    std::cout << "Reading graph stream...\n";
+    auto start_stream = std::chrono::high_resolution_clock::now();
+    GraphStream graph_stream(filename, delimiter, skip);
+    auto stop_stream = std::chrono::high_resolution_clock::now();
+    double time_stream = (double) ((std::chrono::duration_cast<std::chrono::milliseconds>(stop_stream - start_stream)).count()) / 1000;
+    std::cout << "Stream successfully read in time " << time_stream << "s\n";
+    std::vector<EdgeStream> stream = graph_stream.get_edges();
+
+    
+    std::chrono::high_resolution_clock::time_point start, stop;
+    double time;
+    
+    auto total_start = std::chrono::high_resolution_clock::now();
     #pragma omp parallel for
     for (auto oracle_path: oracle_list) {
         // -- read oracle
-        ankerl::unordered_dense::map<long, int> heaviness_oracle;
-        auto start = std::chrono::high_resolution_clock::now();
-        Utils::read_oracle(oracle_path, delimiter, skip, heaviness_oracle);
+	ankerl::unordered_dense::map<long, int> heaviness_oracle; 
+	auto start = std::chrono::high_resolution_clock::now();
+	Utils::read_oracle(oracle_path, delimiter, skip, heaviness_oracle);
         auto stop = std::chrono::high_resolution_clock::now();
         double time = (double) ((std::chrono::duration_cast<std::chrono::milliseconds>(stop - start)).count()) / 1000;
-        std::cout << "# Thread " << omp_get_thread_num() <<
-                  " || Oracle " << oracle_path << " successfully read in time: " << time << " s\n";
-        Tonic_algos.emplace_back(memory_budget, random_seed, alpha, beta, heaviness_oracle);
-    }
+        int thread_idx = (int) omp_get_thread_num();
+	std::cout << "# Thread " << thread_idx <<
+                  " || Oracle " << oracle_path << " successfully read in time: " << time << " s || Oracle size: " << heaviness_oracle.size() << "\n";
+	
 
-    GraphStream graph_stream(filename, delimiter, skip);
-    std::cout << "Stream successfully read\n";
-    std::vector<EdgeStream> stream = graph_stream.get_edges();
-    long t = 0;
-    int i = 0;
-
-    std::chrono::high_resolution_clock::time_point start, stop;
-    double time;
-
-    auto total_start = std::chrono::high_resolution_clock::now();
-
-    #pragma omp parallel for private(i, t, start, stop, time)
-    for (auto WRP_algo: Tonic_algos) {
-
+	WRPSampling WRP_algo(memory_budget, random_seed, alpha, beta, heaviness_oracle);
+	long t = 0;
         start = std::chrono::high_resolution_clock::now();
-        for (i = 0; i < stream.size(); i++) {
+        for (int i = 0; i < stream.size(); i++) {
             WRP_algo.process_edge(stream[i].u, stream[i].v);
             t++;
             // -- output log
@@ -74,10 +76,11 @@ void wrp_sampling_parallel(const std::string &filename, const char &delimiter, i
 
     }
 
-    auto total_stop = std::chrono::high_resolution_clock::now();
-    double total_time =
-            (double) ((std::chrono::duration_cast<std::chrono::milliseconds>(total_stop - total_start)).count()) / 1000;
 
+
+    auto total_stop = std::chrono::high_resolution_clock::now();
+    double total_time = (double) ((std::chrono::duration_cast<std::chrono::milliseconds>(total_stop - total_start)).count()) / 1000;
+    std::cout << "Overall time elapsed: " << total_time << " s\n";
     outFile.close();
 
 }
@@ -185,7 +188,7 @@ int main(int argc, char **argv) {
     for (int idx_oracle = 7; idx_oracle < argc; idx_oracle++) {
         std::string oracle_filename(argv[idx_oracle]);
         oracle_list.push_back(oracle_filename);
-        std::cout << oracle_list[idx_oracle - 7] << "\n";
+        // std::cout << oracle_list[idx_oracle - 7] << "\n";
     }
 
     // -- run main algo

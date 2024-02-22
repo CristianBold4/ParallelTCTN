@@ -1,0 +1,32 @@
+Bootstrap: library
+From: ubuntu:22.04
+
+# bind files
+%files
+	# /stor/progetti/p1026/p1026u10/ParallelTC/datasets /mnt/datasets
+	# /stor/progetti/p1026/p1026u10/ParallelTC/oracles /mnt/oracles
+	
+	/home/cristian/Desktop/HPC-Capri/ParallelTCTN/datasets /mnt
+	/home/cristian/Desktop/HPC-Capri/ParallelTCTN/oracles /mnt
+
+%post
+	apt-get update
+	apt-get install -y git  make cmake g++
+
+	git clone https://github.com/CristianBold4/ParallelTCTN.git
+	
+	cd ParallelTCTN
+	git checkout base
+
+	# Compile sources
+	bash ./compile.sh
+
+%runscript
+
+	cd ../ParallelTCTN
+	# run oracles sequentially
+	./build/Tonic 4177 100000 0.05 0.2 /mnt/datasets/stackoverflow_preprocessed.txt /mnt/out_stackoverflow /mnt/oracles/oracle_stackoverflow_top10.txt 
+
+	# run mt oracle
+
+	
