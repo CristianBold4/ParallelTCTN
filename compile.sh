@@ -1,5 +1,6 @@
 #!/bin/bash
 
+cd code
 # --  compile ankerl
 cd unordered_dense
 rm -rf build
