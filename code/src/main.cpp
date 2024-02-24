@@ -87,7 +87,7 @@ void wrp_sampling_parallel(const std::string &filename, const char &delimiter, i
     auto total_stop = std::chrono::high_resolution_clock::now();
     double total_time = (double) ((std::chrono::duration_cast<std::chrono::milliseconds>(total_stop - total_start)).count()) / 1000;
     std::cout << "Overall time elapsed: " << (time_stream + total_time) << " s\n";
-    outFile << "Mean Estimate: " << mean_results << ", Mean Time per Estimate: " << mean_times << " s\n Overall Time Elapsed: " << (time_stream+total_time) << "(s)"; 
+    outFile << "Mean Estimate: " << mean_results << ", Mean Time per Estimate: " << mean_times << " s\nOverall Time Elapsed: " << (time_stream+total_time) << "(s)\n"; 
     outFile.close();
 
 }
