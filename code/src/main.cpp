@@ -34,7 +34,9 @@ void wrp_sampling_parallel(const std::string &filename, const char &delimiter, i
     
     std::chrono::high_resolution_clock::time_point start, stop;
     double time;
-    
+    double mean_results = 0.0;
+    double mean_times = 0.0;
+
     auto total_start = std::chrono::high_resolution_clock::now();
     #pragma omp parallel for
     for (auto oracle_path: oracle_list) {
@@ -74,13 +76,18 @@ void wrp_sampling_parallel(const std::string &filename, const char &delimiter, i
         outFile << "# Thread " << omp_get_thread_num() << " || Global Count: " << std::fixed << global_count
                 << "\nTime Elapsed: " << time << "(s)\n";
 
+	mean_results += global_count/n_oracles;
+	mean_times += time/n_oracles;
+
+
     }
 
 
 
     auto total_stop = std::chrono::high_resolution_clock::now();
     double total_time = (double) ((std::chrono::duration_cast<std::chrono::milliseconds>(total_stop - total_start)).count()) / 1000;
-    std::cout << "Overall time elapsed: " << total_time << " s\n";
+    std::cout << "Overall time elapsed: " << (time_stream + total_time) << " s\n";
+    outFile << "Mean Estimate: " << mean_results << ", Mean Time per Estimate: " << mean_times << " s\n Overall Time Elapsed: " << (time_stream+total_time) << "(s)"; 
     outFile.close();
 
 }

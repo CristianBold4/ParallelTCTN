@@ -5,15 +5,13 @@ From: ubuntu:22.04
 	# /stor/progetti/p1026/p1026u10/ParallelTC/datasets mnt/datasets
 	# /stor/progetti/p1026/p1026u10/ParallelTC/oracles mnt/oracles
 	
-	/home/cristian/Desktop/HPC-Capri/ParallelTCTN/datasets mnt/
-	/home/cristian/Desktop/HPC-Capri/ParallelTCTN/oracles mnt/
-
 %post
+
 	apt-get update
 	apt-get install -y git  make cmake g++
 
 	
-	cd ../home/
+	cd /mnt/
 	git clone https://github.com/CristianBold4/ParallelTCTN.git
 	
 	cd ParallelTCTN/
