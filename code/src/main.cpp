@@ -11,14 +11,15 @@
 
 void wrp_sampling_parallel(const std::string &filename, const char &delimiter, int skip, int memory_budget,
                            int random_seed, double alpha, double beta,
-                           const std::vector<std::string> &oracle_list, std::string &out_path) {
+                           const std::vector<std::string> &oracle_list, std::string &out_path,
+                           int n_threads) {
 
     const int n_oracles = (int) oracle_list.size();
     std::vector<WRPSampling> Tonic_algos;
     Tonic_algos.reserve(n_oracles);
 
     omp_set_dynamic(0);
-    omp_set_num_threads(n_oracles);
+    omp_set_num_threads(n_threads);
 
     // -- output_files
     std::ofstream outFile(out_path + "_global_count.txt");
@@ -31,7 +32,7 @@ void wrp_sampling_parallel(const std::string &filename, const char &delimiter, i
     std::cout << "Stream successfully read in time " << time_stream << "s\n";
     std::vector<EdgeStream> stream = graph_stream.get_edges();
 
-    
+
     std::chrono::high_resolution_clock::time_point start, stop;
     double time;
     double mean_results = 0.0;
@@ -169,9 +170,9 @@ int main(int argc, char **argv) {
 
     }
 
-    if (argc < 8) {
+    if (argc < 9) {
         std::cerr << "Usage: Tonic (random_seed) (memory_budget) (alpha)"
-                     " (beta) (dataset_path) (output_path) ([list of oracles...])\n";
+                     " (beta) (dataset_path) (output_path) (n_threads) ([list of oracles...])\n";
         return 0;
     }
 
@@ -189,10 +190,10 @@ int main(int argc, char **argv) {
     skip = 0;
     std::string out_path(argv[6]);
 
+    int n_threads = atoi(argv[7]);
 
-    int n_oracles = (argc - 7);
     std::vector<std::string> oracle_list;
-    for (int idx_oracle = 7; idx_oracle < argc; idx_oracle++) {
+    for (int idx_oracle = 8; idx_oracle < argc; idx_oracle++) {
         std::string oracle_filename(argv[idx_oracle]);
         oracle_list.push_back(oracle_filename);
         // std::cout << oracle_list[idx_oracle - 7] << "\n";
@@ -200,7 +201,7 @@ int main(int argc, char **argv) {
 
     // -- run main algo
     wrp_sampling_parallel(filename, delimiter, skip, memory_budget, random_seed, alpha, beta,
-                          oracle_list, out_path);
+                          oracle_list, out_path, n_threads);
 
     return 0;
 
