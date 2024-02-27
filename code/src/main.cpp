@@ -22,7 +22,7 @@ void wrp_sampling_parallel(const std::string &filename, const char &delimiter, i
     omp_set_num_threads(n_threads);
 
     // -- output_files
-    std::ofstream outFile(out_path + "_global_count.txt");
+    std::ofstream outFile(out_path + "_global_count.txt", std::ios::app);
 
     std::cout << "Reading graph stream...\n";
     auto start_stream = std::chrono::high_resolution_clock::now();
