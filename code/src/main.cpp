@@ -42,6 +42,7 @@ void wrp_sampling_parallel(const std::string &filename, const char &delimiter, i
     #pragma omp parallel for
     for (auto oracle_path: oracle_list) {
         // -- read oracle
+	srand(random_seed);
 	ankerl::unordered_dense::map<long, int> heaviness_oracle; 
 	auto start = std::chrono::high_resolution_clock::now();
 	Utils::read_oracle(oracle_path, delimiter, skip, heaviness_oracle);
